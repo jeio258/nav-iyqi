@@ -1,0 +1,11 @@
+name = "nav"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Pages 输出目录
+pages_build_output_dir = "."
+
+# KV 命名空间绑定（替换为你的实际 ID）
+[[kv_namespaces]]
+binding = "NAV_LINKS"
+id = "your-kv-namespace-id-here"

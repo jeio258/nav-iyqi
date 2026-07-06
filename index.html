@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes, viewport-fit=cover">
+    <title>临渊羡鱼 · 导航页</title>
+    <meta name="description" content="临渊羡鱼个人导航页面">
+    <meta name="theme-color" content="#f5ebe0">
+
+    <link rel="preconnect" href="https://s4.zstatic.net">
+    <link rel="preconnect" href="https://faviconsnap.com">
+    <link rel="dns-prefetch" href="https://v1.hitokoto.cn">
+
+    <link rel="stylesheet" href="https://s4.zstatic.net/ajax/libs/lxgw-wenkai-webfont/1.7.0/lxgwwenkai-regular.min.css" media="print" onload="this.media='all'">
+
+    <style>
+        /* ========== CSS 变量 - 与 admin 完全统一 ========== */
+        :root {
+            --font-family: "LXGW WenKai", "Inter", "Segoe UI", "Roboto", system-ui, -apple-system, sans-serif;
+            
+            /* 浅色模式 */
+            --bg: #f5ebe0;
+            --card-bg: rgba(255, 250, 245, 0.85);
+            --text: #4d3a28;
+            --text-secondary: #8b7355;
+            --border: rgba(230, 210, 180, 0.6);
+            --accent: #c7a87b;
+            --focus: #c49a6c;
+            --header-bg: #e7d7bc;
+            --header-text: #3a2e21;
+            --footer-text: #7a6a5a;
+            --footer-from: #a8947e;
+            --avatar-bg: rgba(243, 231, 217, 0.8);
+            --avatar-hover: #decdb2;
+            --skeleton: rgba(255, 255, 255, 0.5);
+            --shadow-sm: 0 6px 16px rgba(140, 100, 60, 0.08);
+            --shadow-hover: 0 12px 24px -8px rgba(160, 110, 50, 0.2);
+            --pill-hover-bg: rgba(255, 252, 245, 0.9);
+            --pill-hover-text: #2f2418;
+            --fallback-text: #5e4532;
+            --input-bg: rgba(255, 255, 255, 0.6);
+        }
+
+        /* 深色模式 - 与 admin 完全统一，无需遮罩层 */
+        [data-theme="dark"] {
+            --bg: #1a1512;
+            --card-bg: rgba(35, 30, 26, 0.85);
+            --text: #e5d9cc;
+            --text-secondary: #b7a48b;
+            --border: rgba(180, 150, 120, 0.3);
+            --accent: #d4b58b;
+            --focus: #d9a87a;
+            --header-bg: #4a3f32;
+            --header-text: #e5d7c4;
+            --footer-text: #b7a48b;
+            --footer-from: #8f7a65;
+            --avatar-bg: rgba(70, 60, 48, 0.8);
+            --avatar-hover: #6b5a45;
+            --skeleton: rgba(200, 180, 150, 0.2);
+            --shadow-sm: 0 6px 16px rgba(0, 0, 0, 0.3);
+            --shadow-hover: 0 12px 24px -8px rgba(0, 0, 0, 0.5);
+            --pill-hover-bg: rgba(50, 44, 36, 0.9);
+            --pill-hover-text: #f0e4d5;
+            --fallback-text: #d4c0a8;
+            --input-bg: rgba(50, 42, 35, 0.6);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg);
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            font-family: var(--font-family);
+            min-height: 100vh;
+            min-height: 100dvh;
+            margin: 0;
+            padding: 2rem 1rem;
+            padding-top: max(2rem, env(safe-area-inset-top));
+            padding-bottom: max(2rem, env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* ❌ 删除遮罩层 */
+        /* body::after { ... } 已移除 */
+
+        .page-header,
+        .links-container,
+        .footer-section {
+            position: relative;
+            z-index: 2;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 2rem;
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .page-header h1 {
+            font-size: clamp(1.6rem, 4vw, 2.2rem);
+            font-weight: 500;
+            color: var(--text);
+            letter-spacing: -0.3px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 0.6rem 1.8rem;
+            border-radius: 100px;
+            border: 1px solid var(--border);
+            margin: 0;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .subtitle-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            flex-wrap: wrap;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            padding: 0.4rem 0.8rem 0.4rem 1.5rem;
+            box-shadow: var(--shadow-sm);
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            transition: all 0.25s ease;
+        }
+
+        .subtitle-text {
+            font-weight: 400;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+
+        .theme-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 50px;
+            padding: 0.35rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text);
+            background: var(--avatar-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: all 0.2s ease;
+            font-family: var(--font-family);
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        .theme-btn:hover {
+            background: var(--pill-hover-bg);
+            border-color: var(--accent);
+            transform: scale(1.02);
+        }
+
+        .links-container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.9rem;
+            padding: 0 0.5rem;
+        }
+
+        .pill-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.7rem;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1.5px solid var(--border);
+            color: var(--text);
+            font-weight: 500;
+            font-size: clamp(0.95rem, 2vw, 1.1rem);
+            padding: clamp(0.8rem, 2vh, 1rem) clamp(1.5rem, 4vw, 2rem);
+            border-radius: 100px;
+            text-decoration: none;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.25s cubic-bezier(0.2, 0.9, 0.4, 1);
+            white-space: nowrap;
+            letter-spacing: 0.3px;
+            line-height: 1.3;
+            cursor: pointer;
+            width: 100%;
+            min-height: 52px;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            position: relative;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .pill-link:active {
+            transform: scale(0.97);
+        }
+
+        @media (hover: hover) {
+            .pill-link:hover {
+                background: var(--pill-hover-bg);
+                border-color: var(--accent);
+                box-shadow: var(--shadow-hover);
+                transform: translateY(-2px);
+                color: var(--pill-hover-text);
+            }
+        }
+
+        .pill-link:focus-visible {
+            outline: 3px solid var(--focus);
+            outline-offset: 4px;
+        }
+
+        .link-avatar {
+            width: clamp(26px, 5vw, 34px);
+            height: clamp(26px, 5vw, 34px);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            overflow: hidden;
+            background: var(--avatar-bg);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+        }
+
+        .link-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .link-avatar .fallback-text {
+            font-weight: 600;
+            color: var(--fallback-text);
+            font-size: clamp(0.85rem, 2vw, 1.05rem);
+            line-height: 1;
+        }
+
+        @media (hover: hover) {
+            .pill-link:hover .link-avatar {
+                background: var(--avatar-hover);
+            }
+        }
+
+        .footer-section {
+            margin-top: 2rem;
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        #runtime {
+            font-size: clamp(11px, 1.5vw, 13px);
+            color: var(--footer-text);
+            margin-bottom: 8px;
+        }
+
+        #runtime span {
+            font-weight: bold;
+            color: #409EFF;
+        }
+
+        #hitokoto-container {
+            font-size: clamp(0.8rem, 1.4vw, 0.9rem);
+            color: var(--footer-text);
+            line-height: 1.6;
+            min-height: 2.5em;
+        }
+
+        #hitokoto-from {
+            display: block;
+            font-size: clamp(0.7rem, 1.2vw, 0.78rem);
+            color: var(--footer-from);
+            margin-top: 2px;
+        }
+
+        .loading-skeleton {
+            background: linear-gradient(90deg, transparent, var(--skeleton), transparent);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+            display: inline-block;
+            min-width: 60%;
+            height: 1em;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .admin-link {
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            opacity: 0.5;
+            transition: opacity 0.3s;
+        }
+
+        .admin-link:hover {
+            opacity: 0.8;
+            color: var(--accent);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 1.5rem 0.8rem;
+                padding-top: max(1.5rem, env(safe-area-inset-top));
+                padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+            }
+            .links-container {
+                gap: 0.75rem;
+                max-width: 500px;
+            }
+            .page-header {
+                margin-bottom: 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 1rem 0.5rem;
+                padding-top: max(1rem, env(safe-area-inset-top));
+                padding-bottom: max(1rem, env(safe-area-inset-bottom));
+            }
+            .links-container {
+                gap: 0.65rem;
+                max-width: 420px;
+            }
+            .pill-link {
+                border-radius: 80px;
+                border-width: 1.2px;
+                gap: 0.5rem;
+                min-height: 46px;
+            }
+            .page-header {
+                margin-bottom: 1.2rem;
+            }
+            .page-header h1 {
+                padding: 0.5rem 1.3rem;
+            }
+            .footer-section {
+                margin-top: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="page-header" role="banner">
+        <h1>🌾 友邻聚落</h1>
+        <div class="subtitle-container">
+            <span class="subtitle-text">临渊羡鱼 · 且行且歌</span>
+            <button class="theme-btn" id="themeToggleBtn" aria-label="切换深色/浅色模式" title="切换深浅模式">
+                <span id="themeIcon">🌙</span>
+                <span id="themeLabel">深色</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="links-container" id="linksContainer" role="list" aria-label="友情链接列表">
+        <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+            <div class="loading-skeleton" style="width: 100%; height: 52px; border-radius: 100px;"></div>
+        </div>
+    </main>
+
+    <footer class="footer-section" role="contentinfo">
+        <div id="runtime">
+            ⏱️ 网站已稳定运行：<span aria-live="polite">0天 00:00:00</span>
+        </div>
+        <div id="hitokoto-container">
+            <span id="hitokoto-text" aria-live="polite">
+                <span class="loading-skeleton" style="width: 80%;"></span>
+            </span>
+            <span id="hitokoto-from"></span>
+        </div>
+        <a href="/admin.html" class="admin-link" title="后台管理">⚙️ 后台管理</a>
+    </footer>
+
+    <script>
+        (function() {
+            const CONFIG = {
+                startDate: '2025-12-01 00:00:00',
+                bgImages: [
+                    'https://t.alcy.cc/moez',
+                    'https://t.alcy.cc/moez?2',
+                    'https://t.alcy.cc/moez?3',
+                    'https://t.alcy.cc/moez?4',
+                    'https://t.alcy.cc/moez?5'
+                ],
+                bgRotateInterval: 8000,
+                hitokotoApi: 'https://v1.hitokoto.cn/?c=f&encode=json',
+                hitokotoInterval: 8000,
+                hitokotoTimeout: 5000,
+                apiBase: '/api/links',
+                fallbackHitokotos: [
+                    '🌱 学而时习之，不亦说乎。',
+                    '🌱 静以修身，俭以养德。',
+                    '🌱 千里之行，始于足下。',
+                    '🌱 博观而约取，厚积而薄发。',
+                    '🌱 路漫漫其修远兮，吾将上下而求索。'
+                ],
+                defaultLinks: [
+                    { name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临' },
+                    { name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图' },
+                    { name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁' },
+                    { name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮' },
+                    { name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦' },
+                    { name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️' }
+                ]
+            };
+
+            const body = document.body;
+            const linksContainer = document.getElementById('linksContainer');
+            const runtimeSpan = document.querySelector('#runtime span');
+            const hitokotoText = document.getElementById('hitokoto-text');
+            const hitokotoFrom = document.getElementById('hitokoto-from');
+            const themeToggleBtn = document.getElementById('themeToggleBtn');
+            const themeIcon = document.getElementById('themeIcon');
+            const themeLabel = document.getElementById('themeLabel');
+
+            // ========== 加载链接 ==========
+            async function loadLinks() {
+                try {
+                    const response = await fetch(CONFIG.apiBase);
+                    if (!response.ok) throw new Error('API 响应错误');
+                    const data = await response.json();
+                    if (data.links && data.links.length > 0) {
+                        renderLinks(data.links.filter(link => link.status === 'active'));
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('无法从 API 加载链接，使用默认链接:', error.message);
+                }
+                renderLinks(CONFIG.defaultLinks);
+            }
+
+            function renderLinks(links) {
+                if (!links || links.length === 0) {
+                    linksContainer.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-secondary);"><p>📭 暂无链接</p></div>';
+                    return;
+                }
+                linksContainer.innerHTML = links.map(link => `
+                    <a href="${link.url}" class="pill-link" target="_blank" rel="noopener noreferrer" role="listitem" title="${link.name}">
+                        <span class="link-avatar">
+                            <img src="https://faviconsnap.com/api/favicon?url=${encodeURIComponent(link.url)}" alt="${link.name}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+                            <span class="fallback-text" style="display:none;">${link.fallback || link.name.charAt(0)}</span>
+                        </span>
+                        <span>${link.name}</span>
+                    </a>
+                `).join('');
+            }
+
+            // ========== 背景轮转 ==========
+            let bgIndex = 0;
+            function rotateBackground() {
+                if (!CONFIG.bgImages.length) return;
+                body.style.backgroundImage = `url('${CONFIG.bgImages[bgIndex]}')`;
+                bgIndex = (bgIndex + 1) % CONFIG.bgImages.length;
+            }
+            rotateBackground();
+            setInterval(rotateBackground, CONFIG.bgRotateInterval);
+
+            // ========== 运行时间 ==========
+            const startDate = new Date(CONFIG.startDate);
+            function updateRuntime() {
+                if (!runtimeSpan) return;
+                const now = new Date();
+                let diff = Math.floor((now - startDate) / 1000);
+                if (diff < 0) diff = 0;
+                const days = Math.floor(diff / 86400);
+                diff %= 86400;
+                const hours = String(Math.floor(diff / 3600)).padStart(2, '0');
+                diff %= 3600;
+                const minutes = String(Math.floor(diff / 60)).padStart(2, '0');
+                const seconds = String(diff % 60).padStart(2, '0');
+                runtimeSpan.textContent = `${days}天 ${hours}:${minutes}:${seconds}`;
+            }
+            updateRuntime();
+            setInterval(updateRuntime, 1000);
+
+            // ========== 一言轮转 ==========
+            let hitokotoTimer;
+            function fetchHitokoto() {
+                if (!hitokotoText) return;
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), CONFIG.hitokotoTimeout);
+                fetch(CONFIG.hitokotoApi, { signal: controller.signal })
+                    .then(res => {
+                        clearTimeout(timeoutId);
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (data && data.hitokoto) {
+                            hitokotoText.textContent = `「${data.hitokoto}」`;
+                            hitokotoFrom.textContent = data.from ? `—— ${data.from}` : '';
+                        } else {
+                            throw new Error('Empty hitokoto');
+                        }
+                    })
+                    .catch(() => {
+                        const fallback = CONFIG.fallbackHitokotos;
+                        hitokotoText.textContent = fallback[Math.floor(Math.random() * fallback.length)];
+                        hitokotoFrom.textContent = '';
+                    });
+            }
+            fetchHitokoto();
+            hitokotoTimer = setInterval(fetchHitokoto, CONFIG.hitokotoInterval);
+
+            // ========== 主题切换（与 admin 统一，无遮罩层） ==========
+            const THEME_KEY = 'theme';
+
+            function applyTheme(theme) {
+                if (theme === 'dark') {
+                    body.setAttribute('data-theme', 'dark');
+                    if (themeIcon) themeIcon.textContent = '☀️';
+                    if (themeLabel) themeLabel.textContent = '浅色';
+                    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#1a1512');
+                } else {
+                    body.removeAttribute('data-theme');
+                    if (themeIcon) themeIcon.textContent = '🌙';
+                    if (themeLabel) themeLabel.textContent = '深色';
+                    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#f5ebe0');
+                }
+                localStorage.setItem(THEME_KEY, theme);
+            }
+
+            const savedTheme = localStorage.getItem(THEME_KEY);
+            if (savedTheme) {
+                applyTheme(savedTheme);
+            } else {
+                applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            }
+
+            if (themeToggleBtn) {
+                themeToggleBtn.addEventListener('click', () => {
+                    const currentTheme = body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+                });
+            }
+
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                if (!localStorage.getItem(THEME_KEY)) {
+                    applyTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+
+            document.addEventListener('DOMContentLoaded', loadLinks);
+            window.addEventListener('beforeunload', () => {
+                if (hitokotoTimer) clearInterval(hitokotoTimer);
+            });
+        })();
+    </script>
+</body>
+</html>
