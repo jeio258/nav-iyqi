@@ -423,7 +423,7 @@ MIT License
 临渊羡鱼
 
 · 博客：https://blog.fnosi.top
-· GitHub：https://github.com/your-username
+· GitHub：https://github.com/jeio258/nav-iyqi
 
 ---
 
