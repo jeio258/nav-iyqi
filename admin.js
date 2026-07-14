@@ -266,17 +266,17 @@ function deleteLink() {
     autoSaveToServer(links); // 自动同步到 KV
 }
 
-// ========== 主题切换（与 index.html 统一使用 'theme' key） ==========
+// ========== 主题切换（与 index.html 统一，data-theme 设置在 html 上实现全局作用） ==========
 function applyTheme(theme) {
     const themeIcon = document.getElementById('themeIcon');
     const themeLabel = document.getElementById('themeLabel');
     if (theme === 'dark') {
-        document.body.setAttribute('data-theme', 'dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
         if (themeIcon) themeIcon.textContent = '☀️';
         if (themeLabel) themeLabel.textContent = '浅色';
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#1a1512');
     } else {
-        document.body.removeAttribute('data-theme');
+        document.documentElement.removeAttribute('data-theme');
         if (themeIcon) themeIcon.textContent = '🌙';
         if (themeLabel) themeLabel.textContent = '深色';
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#f5ebe0');
@@ -328,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // 主题切换
     document.getElementById('themeToggle').addEventListener('click', () => {
-        const currentTheme = document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+        const currentTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
         applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
     });
     

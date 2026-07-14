@@ -90,8 +90,23 @@
             transition: background-color 0.3s ease, color 0.3s ease;
         }
 
-        /* ❌ 删除遮罩层 */
-        /* body::after { ... } 已移除 */
+        /* 深色模式全局遮罩层 - 覆盖背景图片实现真正全局暗化 */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+            transition: background-color 0.3s ease;
+            background-color: transparent;
+        }
+
+        [data-theme="dark"] body::after {
+            background-color: rgba(0, 0, 0, 0.35);
+        }
 
         .page-header,
         .links-container,
@@ -540,17 +555,17 @@
             fetchHitokoto();
             hitokotoTimer = setInterval(fetchHitokoto, CONFIG.hitokotoInterval);
 
-            // ========== 主题切换（与 admin 统一，无遮罩层） ==========
+            // ========== 主题切换（与 admin 统一，深色模式下添加全局遮罩层） ==========
             const THEME_KEY = 'theme';
 
             function applyTheme(theme) {
                 if (theme === 'dark') {
-                    body.setAttribute('data-theme', 'dark');
+                    document.documentElement.setAttribute('data-theme', 'dark');
                     if (themeIcon) themeIcon.textContent = '☀️';
                     if (themeLabel) themeLabel.textContent = '浅色';
                     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#1a1512');
                 } else {
-                    body.removeAttribute('data-theme');
+                    document.documentElement.removeAttribute('data-theme');
                     if (themeIcon) themeIcon.textContent = '🌙';
                     if (themeLabel) themeLabel.textContent = '深色';
                     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#f5ebe0');
@@ -567,7 +582,7 @@
 
             if (themeToggleBtn) {
                 themeToggleBtn.addEventListener('click', () => {
-                    const currentTheme = body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+                    const currentTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
                     applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
                 });
             }
