@@ -2,6 +2,8 @@
 const API_BASE = '/api';
 const TOKEN_KEY = 'admin_token';
 const LINKS_STORAGE_KEY = 'nav_links';
+const ENGINES_STORAGE_KEY = 'nav_search_engines';
+const SETTINGS_STORAGE_KEY = 'nav_settings';
 const THEME_KEY = 'theme'; // 与 index.html 统一
 
 // 默认链接数据
@@ -13,6 +15,19 @@ const DEFAULT_LINKS = [
     { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active', order: 4 },
     { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active', order: 5 }
 ];
+
+const DEFAULT_ENGINES = [
+    { id: 'baidu', label: '百度', urlFormat: 'https://www.baidu.com/s?wd=%s', icon: '🔵', enabled: true },
+    { id: 'bing', label: 'Bing', urlFormat: 'https://www.bing.com/search?q=%s', icon: '🔍', enabled: true },
+    { id: 'google', label: 'Google', urlFormat: 'https://www.google.com/search?q=%s', icon: '🌈', enabled: true },
+    { id: 'duckduckgo', label: 'DuckDuckGo', urlFormat: 'https://duckduckgo.com/?q=%s', icon: '🦆', enabled: true }
+];
+
+const DEFAULT_SETTINGS = {
+    title: '🌾 友邻聚落',
+    subtitle: '临渊羡鱼 · 且行且歌',
+    startDate: '2025-12-01 00:00:00'
+};
 
 // ========== 工具函数 ==========
 function getLinks() {
@@ -29,6 +44,30 @@ function saveLinks(links) {
 
 function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+}
+
+function getEngines() {
+    const stored = localStorage.getItem(ENGINES_STORAGE_KEY);
+    if (stored) {
+        try { return JSON.parse(stored); } catch (e) { return [...DEFAULT_ENGINES]; }
+    }
+    return [...DEFAULT_ENGINES];
+}
+
+function saveEngines(engines) {
+    localStorage.setItem(ENGINES_STORAGE_KEY, JSON.stringify(engines));
+}
+
+function getSettings() {
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (stored) {
+        try { return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) }; } catch (e) { return { ...DEFAULT_SETTINGS }; }
+    }
+    return { ...DEFAULT_SETTINGS };
+}
+
+function saveSettings(settings) {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
 }
 
 function getToken() {
@@ -171,10 +210,123 @@ function renderLinks(links) {
     document.querySelectorAll('.delete-btn').forEach(btn => btn.addEventListener('click', () => openDeleteModal(btn.dataset.id)));
 }
 
+// ========== 搜索引擎渲染 ==========
+function renderEngines(engines) {
+    const engineList = document.getElementById('engineList');
+    if (!engines || engines.length === 0) {
+        engineList.innerHTML = '<li style="text-align: center; padding: 1rem; color: var(--text-secondary);"><p>📭 暂无搜索引擎</p></li>';
+        return;
+    }
+    engineList.innerHTML = engines.map(engine => `
+        <li class="link-item" data-id="${engine.id}">
+            <div class="link-info">
+                <div class="link-avatar">${engine.icon || '🔍'}</div>
+                <div class="link-details">
+                    <h4>${engine.label} ${engine.enabled === false ? '<span class="badge badge-inactive">已禁用</span>' : '<span class="badge badge-active">启用中</span>'}</h4>
+                    <span>${engine.urlFormat}</span>
+                </div>
+            </div>
+            <div class="link-actions">
+                <button class="btn btn-${engine.enabled !== false ? 'secondary' : 'primary'} btn-sm toggle-engine-btn" data-id="${engine.id}">${engine.enabled !== false ? '⏸️ 禁用' : '▶️ 启用'}</button>
+                <button class="btn btn-secondary btn-sm edit-engine-btn" data-id="${engine.id}">✏️ 编辑</button>
+                <button class="btn btn-danger btn-sm delete-engine-btn" data-id="${engine.id}">🗑️</button>
+            </div>
+        </li>
+    `).join('');
+    document.querySelectorAll('.edit-engine-btn').forEach(btn => btn.addEventListener('click', () => openEngineEditModal(btn.dataset.id)));
+    document.querySelectorAll('.delete-engine-btn').forEach(btn => btn.addEventListener('click', () => deleteEngine(btn.dataset.id)));
+    document.querySelectorAll('.toggle-engine-btn').forEach(btn => btn.addEventListener('click', () => toggleEngine(btn.dataset.id)));
+}
+
+function openEngineAddModal() {
+    document.getElementById('engineModalTitle').textContent = '添加搜索引擎';
+    document.getElementById('engineId').value = '';
+    document.getElementById('engineLabel').value = '';
+    document.getElementById('engineUrl').value = '';
+    document.getElementById('engineIcon').value = '';
+    document.getElementById('engineModalAlert').style.display = 'none';
+    document.getElementById('engineModal').classList.add('active');
+    setTimeout(() => document.getElementById('engineLabel').focus(), 100);
+}
+
+function openEngineEditModal(id) {
+    const engines = getEngines();
+    const engine = engines.find(e => e.id === id);
+    if (!engine) return;
+    document.getElementById('engineModalTitle').textContent = '编辑搜索引擎';
+    document.getElementById('engineId').value = engine.id;
+    document.getElementById('engineLabel').value = engine.label;
+    document.getElementById('engineUrl').value = engine.urlFormat;
+    document.getElementById('engineIcon').value = engine.icon || '';
+    document.getElementById('engineModalAlert').style.display = 'none';
+    document.getElementById('engineModal').classList.add('active');
+    setTimeout(() => document.getElementById('engineLabel').focus(), 100);
+}
+
+function saveEngine() {
+    const id = document.getElementById('engineId').value;
+    const label = document.getElementById('engineLabel').value.trim();
+    const urlFormat = document.getElementById('engineUrl').value.trim();
+    const icon = document.getElementById('engineIcon').value.trim();
+
+    if (!label) { showAlert('engineModalAlert', '请输入搜索引擎名称', 'error'); return; }
+    if (!urlFormat) { showAlert('engineModalAlert', '请输入搜索 URL', 'error'); return; }
+    if (!urlFormat.includes('%s')) { showAlert('engineModalAlert', 'URL 必须包含 %s 作为搜索关键词占位符', 'error'); return; }
+
+    const engines = getEngines();
+    if (id) {
+        const index = engines.findIndex(e => e.id === id);
+        if (index !== -1) engines[index] = { ...engines[index], label, urlFormat, icon: icon || '🔍' };
+    } else {
+        engines.push({ id: generateId(), label, urlFormat, icon: icon || '🔍', enabled: true });
+    }
+    saveEngines(engines);
+    closeModal('engineModal');
+    renderEngines(engines);
+    showAlert('saveAlert', '✅ 搜索引擎已保存', 'success');
+}
+
+function deleteEngine(id) {
+    if (!confirm('确定要删除这个搜索引擎吗？')) return;
+    const engines = getEngines().filter(e => e.id !== id);
+    saveEngines(engines);
+    renderEngines(engines);
+    showAlert('saveAlert', '✅ 搜索引擎已删除', 'success');
+}
+
+function toggleEngine(id) {
+    const engines = getEngines();
+    const engine = engines.find(e => e.id === id);
+    if (engine) {
+        engine.enabled = engine.enabled === false ? true : false;
+        saveEngines(engines);
+        renderEngines(engines);
+    }
+}
+
+// ========== 站点设置 ==========
+function loadSettingsToForm() {
+    const settings = getSettings();
+    document.getElementById('siteTitle').value = settings.title || '';
+    document.getElementById('siteSubtitle').value = settings.subtitle || '';
+    document.getElementById('siteStartDate').value = settings.startDate || '';
+}
+
+function saveSettingsToStore() {
+    const settings = {
+        title: document.getElementById('siteTitle').value.trim(),
+        subtitle: document.getElementById('siteSubtitle').value.trim(),
+        startDate: document.getElementById('siteStartDate').value.trim()
+    };
+    saveSettings(settings);
+    showAlert('settingsAlert', '✅ 站点设置已保存（刷新首页生效）', 'success');
+}
+
 function showAdminPanel() {
     document.getElementById('loginPanel').style.display = 'none';
     document.getElementById('adminPanel').style.display = 'block';
     refreshLinks();
+    loadSettingsToForm();
 }
 
 function showLoginPanel() {
@@ -325,6 +477,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('cancelLinkBtn').addEventListener('click', () => closeModal('linkModal'));
     document.getElementById('confirmDeleteBtn').addEventListener('click', deleteLink);
     document.getElementById('cancelDeleteBtn').addEventListener('click', () => closeModal('deleteModal'));
+
+    // 搜索引擎按钮事件
+    document.getElementById('addEngineBtn').addEventListener('click', openEngineAddModal);
+    document.getElementById('saveEngineBtn').addEventListener('click', saveEngine);
+    document.getElementById('cancelEngineBtn').addEventListener('click', () => closeModal('engineModal'));
+
+    // 设置保存
+    document.getElementById('saveSettingsBtn').addEventListener('click', saveSettingsToStore);
+
+    // 初始化引擎列表
+    renderEngines(getEngines());
     
     // 主题切换
     document.getElementById('themeToggle').addEventListener('click', () => {
@@ -333,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // 模态框外部点击关闭
-    ['linkModal', 'deleteModal'].forEach(modalId => {
+    ['linkModal', 'deleteModal', 'engineModal'].forEach(modalId => {
         document.getElementById(modalId).addEventListener('click', (e) => {
             if (e.target === e.currentTarget) closeModal(modalId);
         });
@@ -344,6 +507,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Escape') {
             if (document.getElementById('linkModal').classList.contains('active')) closeModal('linkModal');
             if (document.getElementById('deleteModal').classList.contains('active')) closeModal('deleteModal');
+            if (document.getElementById('engineModal').classList.contains('active')) closeModal('engineModal');
         }
     });
     

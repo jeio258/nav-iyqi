@@ -196,6 +196,130 @@
             transform: scale(1.02);
         }
 
+        /* ========== 搜索框 ========== */
+        .search-container {
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 1.5rem;
+            padding: 0 0.5rem;
+            position: relative;
+            z-index: 2;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1.5px solid var(--border);
+            border-radius: 100px;
+            padding: 0.25rem 0.25rem 0.25rem 1.2rem;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.25s ease;
+        }
+
+        .search-box:focus-within {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .search-engine-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: var(--avatar-bg);
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .search-engine-btn:hover {
+            background: var(--avatar-hover);
+        }
+
+        .search-engine-dropdown {
+            display: none;
+            position: absolute;
+            top: 110%;
+            left: 0;
+            background: var(--card-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 0.5rem;
+            min-width: 160px;
+            z-index: 20;
+            box-shadow: var(--shadow-hover);
+        }
+
+        .search-engine-dropdown.show {
+            display: block;
+        }
+
+        .search-engine-dropdown .se-option {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.6rem 0.8rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .search-engine-dropdown .se-option:hover {
+            background: var(--avatar-bg);
+            color: var(--text);
+        }
+
+        .search-box input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text);
+            font-size: clamp(0.9rem, 2vw, 1rem);
+            font-family: var(--font-family);
+            padding: 0.5rem 0.6rem;
+            min-width: 0;
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+
+        .search-submit-btn {
+            background: var(--accent);
+            border: none;
+            color: #fff;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .search-submit-btn:hover {
+            filter: brightness(1.1);
+            transform: scale(1.05);
+        }
+
         .links-container {
             width: 100%;
             max-width: 600px;
@@ -405,6 +529,18 @@
         </div>
     </header>
 
+    <!-- 搜索框 -->
+    <div class="search-container">
+        <div class="search-box" id="searchBox">
+            <button class="search-engine-btn" id="engineBtn" title="切换搜索引擎" aria-label="切换搜索引擎">
+                <span id="engineIcon">🔵</span>
+            </button>
+            <div class="search-engine-dropdown" id="engineDropdown"></div>
+            <input type="text" id="searchInput" placeholder="搜索..." autocomplete="off" aria-label="搜索输入">
+            <button class="search-submit-btn" id="searchBtn" aria-label="搜索">🔍</button>
+        </div>
+    </div>
+
     <main class="links-container" id="linksContainer" role="list" aria-label="友情链接列表">
         <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
             <div class="loading-skeleton" style="width: 100%; height: 52px; border-radius: 100px;"></div>
@@ -428,6 +564,7 @@
         (function() {
             const CONFIG = {
                 startDate: '2025-12-01 00:00:00',
+                settingsStorageKey: 'nav_settings',
                 bgImages: [
                     'https://t.alcy.cc/moez',
                     'https://t.alcy.cc/moez?2',
@@ -454,6 +591,12 @@
                     { name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮' },
                     { name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦' },
                     { name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️' }
+                ],
+                searchEngines: [
+                    { id: 'baidu', label: '百度', urlFormat: 'https://www.baidu.com/s?wd=%s', icon: '🔵', enabled: true },
+                    { id: 'bing', label: 'Bing', urlFormat: 'https://www.bing.com/search?q=%s', icon: '🔍', enabled: true },
+                    { id: 'google', label: 'Google', urlFormat: 'https://www.google.com/search?q=%s', icon: '🌈', enabled: true },
+                    { id: 'duckduckgo', label: 'DuckDuckGo', urlFormat: 'https://duckduckgo.com/?q=%s', icon: '🦆', enabled: true }
                 ]
             };
 
@@ -465,6 +608,89 @@
             const themeToggleBtn = document.getElementById('themeToggleBtn');
             const themeIcon = document.getElementById('themeIcon');
             const themeLabel = document.getElementById('themeLabel');
+            const searchInput = document.getElementById('searchInput');
+            const searchBtn = document.getElementById('searchBtn');
+            const engineBtn = document.getElementById('engineBtn');
+            const engineIcon = document.getElementById('engineIcon');
+            const engineDropdown = document.getElementById('engineDropdown');
+
+            // 搜索引擎：优先从 localStorage 加载，其次用默认
+            let searchEngines = [];
+            const SE_STORAGE_KEY = 'nav_search_engines';
+            let activeEngine = null;
+
+            function loadSearchEngines() {
+                const stored = localStorage.getItem(SE_STORAGE_KEY);
+                if (stored) {
+                    try {
+                        const parsed = JSON.parse(stored);
+                        if (parsed && parsed.length > 0) {
+                            searchEngines = parsed.filter(e => e.enabled !== false);
+                        }
+                    } catch (e) { /* fall through */ }
+                }
+                if (searchEngines.length === 0) {
+                    searchEngines = CONFIG.searchEngines.filter(e => e.enabled !== false);
+                }
+                if (searchEngines.length === 0) {
+                    searchEngines = [CONFIG.searchEngines[0]];
+                }
+                activeEngine = searchEngines[0];
+                updateEngineUI();
+                renderEngineDropdown();
+            }
+
+            function updateEngineUI() {
+                if (!activeEngine) return;
+                engineIcon.textContent = activeEngine.icon || '🔍';
+                engineBtn.title = '搜索引擎: ' + activeEngine.label;
+            }
+
+            function renderEngineDropdown() {
+                engineDropdown.innerHTML = searchEngines.map(e =>
+                    `<div class="se-option" data-id="${e.id}">${e.icon || '🔍'} ${e.label}</div>`
+                ).join('');
+                engineDropdown.querySelectorAll('.se-option').forEach(opt => {
+                    opt.addEventListener('click', () => {
+                        const found = searchEngines.find(e => e.id === opt.dataset.id);
+                        if (found) {
+                            activeEngine = found;
+                            updateEngineUI();
+                            engineDropdown.classList.remove('show');
+                        }
+                    });
+                });
+            }
+
+            // 搜索引擎切换按钮
+            engineBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                engineDropdown.classList.toggle('show');
+            });
+
+            // 点击外部关闭下拉
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#searchBox')) {
+                    engineDropdown.classList.remove('show');
+                }
+            });
+
+            // 搜索提交
+            function doSearch() {
+                const query = searchInput.value.trim();
+                if (!query) return;
+                if (!activeEngine) {
+                    activeEngine = searchEngines[0];
+                    if (!activeEngine) return;
+                }
+                const url = activeEngine.urlFormat.replace('%s', encodeURIComponent(query));
+                window.open(url, '_blank');
+            }
+
+            searchBtn.addEventListener('click', doSearch);
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') doSearch();
+            });
 
             // ========== 加载链接 ==========
             async function loadLinks() {
@@ -509,7 +735,18 @@
             setInterval(rotateBackground, CONFIG.bgRotateInterval);
 
             // ========== 运行时间 ==========
-            const startDate = new Date(CONFIG.startDate);
+            function getStartDate() {
+                const stored = localStorage.getItem(CONFIG.settingsStorageKey);
+                if (stored) {
+                    try {
+                        const settings = JSON.parse(stored);
+                        if (settings.startDate) return settings.startDate;
+                    } catch (e) { /* ignore */ }
+                }
+                return CONFIG.startDate;
+            }
+
+            const startDate = new Date(getStartDate());
             function updateRuntime() {
                 if (!runtimeSpan) return;
                 const now = new Date();
@@ -593,7 +830,19 @@
                 }
             });
 
-            document.addEventListener('DOMContentLoaded', loadLinks);
+            document.addEventListener('DOMContentLoaded', () => {
+                loadSearchEngines();
+                loadLinks();
+                // 从 localStorage 加载站点设置
+                try {
+                    const stored = localStorage.getItem(CONFIG.settingsStorageKey);
+                    if (stored) {
+                        const settings = JSON.parse(stored);
+                        if (settings.title) document.querySelector('.page-header h1').textContent = settings.title;
+                        if (settings.subtitle) document.querySelector('.subtitle-text').textContent = settings.subtitle;
+                    }
+                } catch (e) { /* ignore */ }
+            });
             window.addEventListener('beforeunload', () => {
                 if (hitokotoTimer) clearInterval(hitokotoTimer);
             });

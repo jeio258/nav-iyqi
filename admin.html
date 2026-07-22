@@ -428,6 +428,38 @@
                 <li style="text-align: center; padding: 2rem; color: var(--text-secondary);">加载中...</li>
             </ul>
 
+            <!-- 搜索引擎配置 -->
+            <div style="margin-top: 2.5rem;">
+                <div class="section-title">
+                    <h2>🔍 搜索引擎</h2>
+                    <button class="btn btn-primary btn-sm" id="addEngineBtn">+ 添加引擎</button>
+                </div>
+                <ul class="link-list" id="engineList">
+                    <li style="text-align: center; padding: 1rem; color: var(--text-secondary);">加载中...</li>
+                </ul>
+            </div>
+
+            <!-- 站点设置 -->
+            <div style="margin-top: 2.5rem;">
+                <div class="section-title">
+                    <h2>⚙️ 站点设置</h2>
+                    <button class="btn btn-success btn-sm" id="saveSettingsBtn">💾 保存设置</button>
+                </div>
+                <div class="alert alert-success" id="settingsAlert"></div>
+                <div class="form-group">
+                    <label for="siteTitle">站点标题</label>
+                    <input type="text" id="siteTitle" placeholder="临渊羡鱼 · 导航页" value="">
+                </div>
+                <div class="form-group">
+                    <label for="siteSubtitle">站点副标题</label>
+                    <input type="text" id="siteSubtitle" placeholder="临渊羡鱼 · 且行且歌" value="">
+                </div>
+                <div class="form-group">
+                    <label for="siteStartDate">建站日期</label>
+                    <input type="text" id="siteStartDate" placeholder="2025-12-01 00:00:00" value="">
+                </div>
+            </div>
+
             <div style="text-align: center; margin-top: 2rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
                 <button class="btn btn-secondary btn-sm" id="refreshBtn">🔄 刷新</button>
                 <button class="btn btn-secondary btn-sm" id="logoutBtn">🚪 退出</button>
@@ -477,6 +509,31 @@
             <div class="modal-actions">
                 <button class="btn btn-danger" id="confirmDeleteBtn" style="flex: 1;">🗑️ 确认删除</button>
                 <button class="btn btn-secondary" id="cancelDeleteBtn" style="flex: 1;">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑搜索引擎模态框 -->
+    <div class="modal-overlay" id="engineModal">
+        <div class="modal">
+            <h3 id="engineModalTitle">添加搜索引擎</h3>
+            <input type="hidden" id="engineId">
+            <div class="form-group">
+                <label for="engineLabel">名称 *</label>
+                <input type="text" id="engineLabel" placeholder="例如：百度" required>
+            </div>
+            <div class="form-group">
+                <label for="engineUrl">搜索 URL * (%s 代表关键词)</label>
+                <input type="text" id="engineUrl" placeholder="https://www.baidu.com/s?wd=%s" required>
+            </div>
+            <div class="form-group">
+                <label for="engineIcon">图标 (emoji)</label>
+                <input type="text" id="engineIcon" placeholder="例如：🔵" maxlength="2">
+            </div>
+            <div class="alert alert-error" id="engineModalAlert"></div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="saveEngineBtn" style="flex: 1;">💾 保存</button>
+                <button class="btn btn-secondary" id="cancelEngineBtn" style="flex: 1;">取消</button>
             </div>
         </div>
     </div>
