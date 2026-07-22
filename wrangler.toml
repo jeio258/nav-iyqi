@@ -3,8 +3,3 @@ compatibility_date = "2024-01-01"
 
 # Pages 高级模式 (_worker.js)
 pages_build_output_dir = "."
-
-# KV 本地开发绑定
-[[kv_namespaces]]
-binding = "NAV_LINKS"
-id = "nav-links-local"
