@@ -358,25 +358,13 @@ body .texture {
     animation: headerIn 0.8s 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.footer-card {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-    background: var(--card-bg);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 1rem 2rem;
-    box-shadow: var(--shadow-sm);
-}
-
 #runtime {
     font-size: clamp(11px, 1.5vw, 13px);
     color: var(--text-secondary);
+    margin-bottom: 6px;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.35rem;
 }
 
@@ -400,33 +388,27 @@ body .texture {
 }
 
 #hitokoto-container {
-    font-size: clamp(0.78rem, 1.4vw, 0.88rem);
+    font-size: clamp(0.8rem, 1.4vw, 0.9rem);
     color: var(--text-secondary);
-    line-height: 1.7;
+    line-height: 1.6;
     min-height: 2.5em;
-    max-width: 420px;
-}
-
-#hitokoto-text {
-    transition: opacity 0.5s ease;
 }
 
 #hitokoto-from {
     display: block;
-    font-size: clamp(0.7rem, 1.2vw, 0.76rem);
+    font-size: clamp(0.7rem, 1.2vw, 0.78rem);
     color: var(--text-tertiary);
-    margin-top: 3px;
+    margin-top: 2px;
     font-style: italic;
 }
 
 .admin-link {
-    margin-top: 0.25rem;
-    font-size: 0.75rem;
-    color: var(--text-tertiary);
+    margin-top: 0.8rem;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
     text-decoration: none;
-    opacity: 0.4;
-    transition: all 0.3s ease;
-    letter-spacing: 0.3px;
+    opacity: 0.5;
+    transition: opacity 0.3s;
 }
 
 .admin-link:hover {
@@ -454,7 +436,6 @@ body .texture {
     body { padding: 2rem 0.8rem; padding-top: max(2rem, env(safe-area-inset-top)); padding-bottom: max(2rem, env(safe-area-inset-bottom)); }
     .links-container { gap: 0.7rem; max-width: 500px; }
     .page-header { margin-bottom: 1.8rem; }
-    .footer-card { padding: 0.8rem 1.5rem; border-radius: 16px; }
 }
 
 @media (max-width: 480px) {
@@ -470,7 +451,6 @@ body .texture {
     .page-header { margin-bottom: 1.4rem; }
     .page-header h1 { padding: 0.55rem 1.4rem; font-size: 1.35rem; }
     .footer-section { margin-top: 1.8rem; }
-    .footer-card { padding: 0.7rem 1.2rem; }
     .link-avatar { border-radius: 10px; width: 28px; height: 28px; }
 }
 </style>
@@ -498,19 +478,17 @@ body .texture {
     </main>
 
     <footer class="footer-section" role="contentinfo">
-        <div class="footer-card">
-            <div id="runtime">
-                <span class="rt-dot"></span>
-                已运行 <span aria-live="polite">0天 00:00:00</span>
-            </div>
-            <div id="hitokoto-container">
-                <span id="hitokoto-text" aria-live="polite">
-                    <span class="loading-skeleton" style="width: 80%;"></span>
-                </span>
-                <span id="hitokoto-from"></span>
-            </div>
-            <a href="/admin" class="admin-link">管理</a>
+        <div id="runtime">
+            <span class="rt-dot"></span>
+            已运行 <span aria-live="polite">0天 00:00:00</span>
         </div>
+        <div id="hitokoto-container">
+            <span id="hitokoto-text" aria-live="polite">
+                <span class="loading-skeleton" style="width: 80%;"></span>
+            </span>
+            <span id="hitokoto-from"></span>
+        </div>
+        <a href="/admin" class="admin-link">管理</a>
     </footer>
 
 <script>
