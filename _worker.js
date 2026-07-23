@@ -134,13 +134,6 @@ const DEFAULT_LINKS = [
   { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active', order: 5 }
 ];
 
-const DEFAULT_ENGINES = [
-  { id: 'baidu', label: '百度', urlFormat: 'https://www.baidu.com/s?wd=%s', icon: '🔵', enabled: true },
-  { id: 'bing', label: 'Bing', urlFormat: 'https://www.bing.com/search?q=%s', icon: '🔍', enabled: true },
-  { id: 'google', label: 'Google', urlFormat: 'https://www.google.com/search?q=%s', icon: '🌈', enabled: true },
-  { id: 'duckduckgo', label: 'DuckDuckGo', urlFormat: 'https://duckduckgo.com/?q=%s', icon: '🦆', enabled: true }
-];
-
 const DEFAULT_SETTINGS = {
   title: '🌾 友邻聚落',
   subtitle: '临渊羡鱼 · 且行且歌',
@@ -205,34 +198,6 @@ router.put('/api/links', authMiddleware, async (c) => {
     if (c.env.NAV_LINKS) {
       await c.env.NAV_LINKS.put('links', JSON.stringify(links));
       return new Response(JSON.stringify({ success: true, message: '链接已保存', count: links.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }
-    return new Response(JSON.stringify({ error: 'KV 存储未配置' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: '保存失败' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-  }
-});
-
-// ========== 搜索引擎 API ==========
-router.get('/api/engines', async (c) => {
-  try {
-    if (c.env.NAV_LINKS) {
-      const data = await c.env.NAV_LINKS.get('engines');
-      if (data) return new Response(JSON.stringify({ engines: JSON.parse(data), source: 'kv' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }
-    return new Response(JSON.stringify({ engines: DEFAULT_ENGINES, source: 'default' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  } catch (error) {
-    return new Response(JSON.stringify({ engines: DEFAULT_ENGINES, source: 'fallback' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
-  }
-});
-
-router.put('/api/engines', authMiddleware, async (c) => {
-  try {
-    const body = await c.req.json();
-    const { engines } = body;
-    if (!engines || !Array.isArray(engines)) return new Response(JSON.stringify({ error: '无效的数据格式' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    if (c.env.NAV_LINKS) {
-      await c.env.NAV_LINKS.put('engines', JSON.stringify(engines));
-      return new Response(JSON.stringify({ success: true, message: '搜索引擎已保存', count: engines.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     return new Response(JSON.stringify({ error: 'KV 存储未配置' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
