@@ -361,30 +361,12 @@ body .texture {
 #runtime {
     font-size: clamp(11px, 1.5vw, 13px);
     color: var(--text-secondary);
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.35rem;
-}
-
-#runtime .rt-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #409EFF;
-    animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50%      { opacity: 0.5; transform: scale(1.5); }
+    margin-bottom: 8px;
 }
 
 #runtime span {
-    font-weight: 600;
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
+    font-weight: bold;
+    color: #409EFF;
 }
 
 #hitokoto-container {
@@ -479,8 +461,7 @@ body .texture {
 
     <footer class="footer-section" role="contentinfo">
         <div id="runtime">
-            <span class="rt-dot"></span>
-            已运行 <span aria-live="polite">0天 00:00:00</span>
+            ⏱️ 网站已稳定运行：<span aria-live="polite">0天 00:00:00</span>
         </div>
         <div id="hitokoto-container">
             <span id="hitokoto-text" aria-live="polite">
