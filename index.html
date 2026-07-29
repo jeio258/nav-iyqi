@@ -11,71 +11,79 @@
 <link rel="preconnect" href="https://faviconsnap.com">
 <link rel="dns-prefetch" href="https://v1.hitokoto.cn">
 
+<!-- Hallmark · genre: editorial · design-system: design.md · designed-as-app -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://s4.zstatic.net/ajax/libs/lxgw-wenkai-webfont/1.7.0/lxgwwenkai-regular.min.css" media="print" onload="this.media='all'">
 
 <style>
+/* Hallmark · macrostructure: Index-First · genre: editorial · theme: warm-paper · design-system: design.md */
 /* ========== CSS 变量 ========== */
 :root {
-    --font-family: "LXGW WenKai", "Inter", "Segoe UI", "Roboto", system-ui, -apple-system, sans-serif;
+    --font-display: "LXGW WenKai", "Noto Serif SC", "PingFang SC", serif;
+    --font-body:    "Inter", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    --font-mono:    "JetBrains Mono", "SF Mono", "Cascadia Code", monospace;
 
-    --bg: #f5ebe0;
-    --card-bg: rgba(255, 250, 245, 0.82);
-    --card-bg-solid: rgba(255, 250, 245, 0.95);
-    --text: #4d3a28;
-    --text-secondary: #8b7355;
-    --text-tertiary: #a8947e;
-    --border: rgba(210, 190, 160, 0.5);
-    --border-strong: rgba(190, 160, 130, 0.45);
-    --accent: #c7a87b;
-    --accent-soft: rgba(199, 168, 123, 0.15);
-    --accent-glow: rgba(199, 168, 123, 0.35);
-    --focus: #c49a6c;
-    --divider: rgba(180, 155, 125, 0.25);
-    --avatar-bg: rgba(235, 220, 200, 0.7);
-    --avatar-hover: #decdb2;
-    --skeleton: rgba(255, 255, 255, 0.5);
-    --shadow-sm: 0 2px 12px rgba(140, 100, 60, 0.06);
-    --shadow-md: 0 6px 20px rgba(140, 100, 60, 0.1);
-    --shadow-hover: 0 12px 32px -6px rgba(160, 110, 50, 0.18);
-    --pill-hover-bg: rgba(255, 252, 245, 0.95);
-    --pill-hover-text: #2f2418;
-    --fallback-text: #5e4532;
-    --overlay-light: rgba(255, 252, 248, 0.25);
-    --overlay-dark: rgba(0, 0, 0, 0.30);
+    --color-paper:       oklch(97% 0.012 80);
+    --color-paper-2:     oklch(93% 0.014 78);
+    --color-paper-3:     oklch(88% 0.010 75);
+    --color-rule:        oklch(82% 0.012 72);
+    --color-rule-strong: oklch(70% 0.010 68);
+    --color-muted:       oklch(55% 0.008 65);
+    --color-ink:         oklch(22% 0.015 60);
+    --color-ink-2:       oklch(35% 0.010 58);
+    --color-accent:      oklch(58% 0.16 62);
+    --color-accent-hover:oklch(50% 0.17 60);
+    --color-accent-soft: oklch(58% 0.16 62 / 0.12);
+    --color-focus:       oklch(52% 0.18 55);
+
+    --space-xs: 0.5rem;   --space-sm: 0.75rem;  --space-md: 1rem;
+    --space-lg: 1.5rem;   --space-xl: 2.5rem;
+
+    --text-sm: 0.875rem;  --text-base: 1rem;    --text-md: 1.125rem;
+    --text-lg: 1.375rem;  --text-xl: 1.75rem;
+
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --dur-short: 220ms;
+
+    --card-bg: oklch(97% 0.012 80 / 0.82);
+    --card-bg-solid: oklch(97% 0.012 80 / 0.95);
+    --shadow-sm: 0 2px 12px oklch(20% 0.01 60 / 0.06);
+    --shadow-md: 0 6px 20px oklch(20% 0.01 60 / 0.10);
+    --shadow-hover: 0 12px 32px -6px oklch(20% 0.01 60 / 0.15);
+    --overlay-light: oklch(97% 0.012 80 / 0.25);
+    --overlay-dark: oklch(0% 0 0 / 0.30);
 }
 
 [data-theme="dark"] {
-    --bg: #1a1512;
-    --card-bg: rgba(30, 26, 22, 0.82);
-    --card-bg-solid: rgba(30, 26, 22, 0.95);
-    --text: #e5d9cc;
-    --text-secondary: #b7a48b;
-    --text-tertiary: #8f7a65;
-    --border: rgba(180, 150, 120, 0.22);
-    --border-strong: rgba(180, 150, 120, 0.32);
-    --accent: #d4b58b;
-    --accent-soft: rgba(212, 181, 139, 0.12);
-    --accent-glow: rgba(212, 181, 139, 0.25);
-    --focus: #d9a87a;
-    --divider: rgba(180, 150, 120, 0.15);
-    --avatar-bg: rgba(70, 60, 48, 0.7);
-    --avatar-hover: #6b5a45;
-    --skeleton: rgba(200, 180, 150, 0.12);
-    --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.25);
-    --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.35);
-    --shadow-hover: 0 12px 32px -6px rgba(0, 0, 0, 0.45);
-    --pill-hover-bg: rgba(50, 44, 36, 0.95);
-    --pill-hover-text: #f0e4d5;
-    --fallback-text: #d4c0a8;
-    --overlay-light: rgba(0, 0, 0, 0.02);
-    --overlay-dark: rgba(0, 0, 0, 0.35);
+    --color-paper:       oklch(15% 0.010 70);
+    --color-paper-2:     oklch(19% 0.012 68);
+    --color-paper-3:     oklch(25% 0.010 65);
+    --color-rule:        oklch(28% 0.008 62);
+    --color-rule-strong: oklch(40% 0.008 60);
+    --color-muted:       oklch(55% 0.006 55);
+    --color-ink:         oklch(94% 0.006 80);
+    --color-ink-2:       oklch(80% 0.005 72);
+    --color-accent:      oklch(68% 0.14 65);
+    --color-accent-hover:oklch(60% 0.15 63);
+    --color-accent-soft: oklch(68% 0.14 65 / 0.10);
+    --color-focus:       oklch(65% 0.16 58);
+
+    --card-bg: oklch(19% 0.012 68 / 0.82);
+    --card-bg-solid: oklch(19% 0.012 68 / 0.95);
+    --shadow-sm: 0 2px 12px oklch(0% 0 0 / 0.25);
+    --shadow-md: 0 6px 20px oklch(0% 0 0 / 0.35);
+    --shadow-hover: 0 12px 32px -6px oklch(0% 0 0 / 0.45);
+    --overlay-light: oklch(0% 0 0 / 0.02);
+    --overlay-dark: oklch(0% 0 0 / 0.35);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-    background-color: var(--bg);
-    font-family: var(--font-family);
+    background-color: var(--color-paper);
+    font-family: var(--font-body);
     min-height: 100vh;
     min-height: 100dvh;
     display: flex;
@@ -143,9 +151,10 @@ body .texture {
 }
 
 .page-header h1 {
+    font-family: var(--font-display);
     font-size: clamp(1.5rem, 4vw, 2rem);
     font-weight: 450;
-    color: var(--text);
+    color: var(--color-ink);
     letter-spacing: 0.5px;
     display: inline-flex;
     align-items: center;
@@ -157,11 +166,11 @@ body .texture {
     -webkit-backdrop-filter: blur(24px);
     padding: 0.7rem 2rem;
     border-radius: 100px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--color-rule);
     margin: 0;
     box-shadow: var(--shadow-sm);
-    transition: all 0.4s ease;
-    animation: headerIn 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+    transition: background 0.4s var(--ease-out), border-color 0.4s var(--ease-out);
+    animation: headerIn 0.8s var(--ease-out) both;
 }
 
 @keyframes headerIn {
@@ -178,14 +187,14 @@ body .texture {
     background: var(--card-bg);
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
-    border: 1px solid var(--border);
+    border: 1px solid var(--color-rule);
     border-radius: 100px;
     padding: 0.45rem 0.9rem 0.45rem 1.5rem;
     box-shadow: var(--shadow-sm);
-    color: var(--text-secondary);
+    color: var(--color-ink-2);
     font-size: 0.88rem;
-    transition: all 0.4s ease;
-    animation: headerIn 0.8s 0.1s cubic-bezier(0.22, 1, 0.36, 1) both;
+    transition: background 0.4s var(--ease-out), border-color 0.4s var(--ease-out);
+    animation: headerIn 0.8s 0.1s var(--ease-out) both;
 }
 
 .subtitle-text {
@@ -198,21 +207,22 @@ body .texture {
     width: 36px;
     height: 2px;
     border-radius: 1px;
-    background: var(--divider);
+    background: var(--color-rule);
     margin: 0.1rem 0;
 }
 
 /* 链接计数 */
 .link-count {
+    font-family: var(--font-mono);
     font-size: 0.78rem;
-    color: var(--text-tertiary);
+    color: var(--color-muted);
     letter-spacing: 0.3px;
-    animation: headerIn 0.8s 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: headerIn 0.8s 0.2s var(--ease-out) both;
 }
 
 .theme-btn {
-    background: var(--avatar-bg);
-    border: 1px solid var(--border);
+    background: var(--color-paper-2);
+    border: 1px solid var(--color-rule);
     border-radius: 50px;
     padding: 0.35rem 1rem;
     display: flex;
@@ -220,19 +230,19 @@ body .texture {
     gap: 0.4rem;
     cursor: pointer;
     font-size: 0.82rem;
-    color: var(--text);
+    color: var(--color-ink);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: all 0.25s ease;
-    font-family: var(--font-family);
+    transition: background var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out);
+    font-family: var(--font-body);
     line-height: 1.2;
     white-space: nowrap;
 }
 
 .theme-btn:hover {
-    background: var(--pill-hover-bg);
-    border-color: var(--accent);
-    box-shadow: 0 0 0 4px var(--accent-soft);
+    background: var(--color-paper-3);
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 4px var(--color-accent-soft);
     transform: translateY(-1px);
 }
 
@@ -249,20 +259,21 @@ body .texture {
 .pill-link {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 0.75rem;
     background: var(--card-bg);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid var(--border);
-    color: var(--text);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--color-rule);
+    color: var(--color-ink);
+    font-family: var(--font-body);
     font-weight: 500;
     font-size: clamp(0.92rem, 2vw, 1.05rem);
     padding: clamp(0.75rem, 2vh, 0.95rem) clamp(1.5rem, 4vw, 2rem);
     border-radius: 100px;
     text-decoration: none;
     box-shadow: var(--shadow-sm);
-    transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: background var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out), box-shadow var(--dur-short) var(--ease-out);
     white-space: nowrap;
     letter-spacing: 0.3px;
     line-height: 1.3;
@@ -276,18 +287,7 @@ body .texture {
     user-select: none;
     opacity: 0;
     transform: translateY(16px);
-    animation: linkIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-.pill-link::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    box-shadow: 0 0 24px 4px var(--accent-glow);
-    pointer-events: none;
+    animation: linkIn 0.5s var(--ease-out) forwards;
 }
 
 @keyframes linkIn {
@@ -298,31 +298,32 @@ body .texture {
 
 @media (hover: hover) {
     .pill-link:hover {
-        background: var(--pill-hover-bg);
-        border-color: var(--accent);
+        background: var(--color-paper-3);
+        border-color: var(--color-accent);
         box-shadow: var(--shadow-hover);
         transform: translateY(-2px);
-        color: var(--pill-hover-text);
+        color: var(--color-ink);
     }
-    .pill-link:hover::after { opacity: 0.6; }
 }
 
 .pill-link:focus-visible {
-    outline: 3px solid var(--focus);
+    outline: 3px solid var(--color-focus);
     outline-offset: 4px;
+    outline-style: solid;
+    transition: none;
 }
 
 .link-avatar {
     width: clamp(28px, 5vw, 36px);
     height: clamp(28px, 5vw, 36px);
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     overflow: hidden;
-    background: var(--avatar-bg);
-    transition: all 0.25s ease;
+    background: var(--color-paper-2);
+    transition: background var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out);
 }
 
 .link-avatar img {
@@ -334,72 +335,89 @@ body .texture {
 }
 
 .link-avatar .fallback-text {
+    font-family: var(--font-display);
     font-weight: 600;
-    color: var(--fallback-text);
+    color: var(--color-ink-2);
     font-size: clamp(0.82rem, 2vw, 1rem);
     line-height: 1;
 }
 
 @media (hover: hover) {
     .pill-link:hover .link-avatar {
-        background: var(--avatar-hover);
-        transform: scale(1.08);
+        background: var(--color-paper-3);
+        transform: scale(1.06);
     }
 }
 
-/* ========== 页脚 ========== */
+/* ========== 页脚（Ft2 Inline 单行） ========== */
 .footer-section {
     margin-top: 2.5rem;
     width: 100%;
     max-width: 600px;
-    text-align: center;
     position: relative;
     z-index: 2;
-    animation: headerIn 0.8s 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--color-rule);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    animation: headerIn 0.8s 0.3s var(--ease-out) both;
+}
+
+.footer-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
 }
 
 #runtime {
     font-size: clamp(11px, 1.5vw, 13px);
-    color: var(--text-secondary);
-    margin-bottom: 8px;
+    color: var(--color-ink-2);
 }
 
 #runtime span {
-    font-weight: bold;
-    color: #409EFF;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    color: var(--color-accent);
 }
 
 #hitokoto-container {
     font-size: clamp(0.8rem, 1.4vw, 0.9rem);
-    color: var(--text-secondary);
+    color: var(--color-ink-2);
     line-height: 1.6;
     min-height: 2.5em;
+    text-align: left;
 }
 
 #hitokoto-from {
     display: block;
     font-size: clamp(0.7rem, 1.2vw, 0.78rem);
-    color: var(--text-tertiary);
+    color: var(--color-muted);
     margin-top: 2px;
-    font-style: italic;
+}
+
+.footer-right {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
 }
 
 .admin-link {
-    margin-top: 0.8rem;
     font-size: 0.8rem;
-    color: var(--text-secondary);
+    color: var(--color-muted);
     text-decoration: none;
-    opacity: 0.5;
-    transition: opacity 0.3s;
+    transition: color var(--dur-short) var(--ease-out);
 }
 
 .admin-link:hover {
-    opacity: 0.8;
-    color: var(--accent);
+    color: var(--color-accent);
 }
 
 .loading-skeleton {
-    background: linear-gradient(110deg, transparent 30%, var(--skeleton) 50%, transparent 70%);
+    background: linear-gradient(110deg, transparent 30%, var(--color-paper-2) 50%, transparent 70%);
     background-size: 200% 100%;
     animation: shimmer 1.8s infinite;
     border-radius: 6px;
@@ -411,6 +429,17 @@ body .texture {
 @keyframes shimmer {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
+}
+
+/* 减少动画 */
+@media (prefers-reduced-motion: reduce) {
+    .pill-link, .page-header h1, .subtitle-container, .link-count, .footer-section {
+        animation: none;
+        opacity: 1;
+        transform: none;
+    }
+    .loading-skeleton { animation: none; }
+    .theme-btn, .pill-link { transition: none; }
 }
 
 /* ========== 响应式 ========== */
@@ -454,22 +483,26 @@ body .texture {
     </header>
 
     <main class="links-container" id="linksContainer" role="list" aria-label="友情链接列表">
-        <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+        <div style="text-align: center; padding: 2rem; color: var(--color-ink-2);">
             <div class="loading-skeleton" style="width: 100%; height: 50px; border-radius: 100px;"></div>
         </div>
     </main>
 
     <footer class="footer-section" role="contentinfo">
-        <div id="runtime">
-            ⏱️ 网站已稳定运行：<span aria-live="polite">0天 00:00:00</span>
+        <div class="footer-left">
+            <div id="runtime">
+                运行 <span aria-live="polite">0天 00:00:00</span>
+            </div>
+            <div id="hitokoto-container">
+                <span id="hitokoto-text" aria-live="polite">
+                    <span class="loading-skeleton" style="width: 200px;"></span>
+                </span>
+                <span id="hitokoto-from"></span>
+            </div>
         </div>
-        <div id="hitokoto-container">
-            <span id="hitokoto-text" aria-live="polite">
-                <span class="loading-skeleton" style="width: 80%;"></span>
-            </span>
-            <span id="hitokoto-from"></span>
+        <div class="footer-right">
+            <a href="/admin" class="admin-link">管理</a>
         </div>
-        <a href="/admin" class="admin-link">管理</a>
     </footer>
 
 <script>
@@ -536,7 +569,7 @@ body .texture {
 
     function renderLinks(links) {
         if (!links || links.length === 0) {
-            linksContainer.innerHTML = '<div style="text-align:center;padding:2.5rem;color:var(--text-tertiary);animation:headerIn .6s ease both"><p style="font-size:2rem;margin-bottom:.5rem">📭</p><p>暂无链接</p></div>';
+            linksContainer.innerHTML = '<div style="text-align:center;padding:2.5rem;color:var(--color-muted);animation:headerIn .6s ease both"><p style="font-size:2rem;margin-bottom:.5rem">📭</p><p>暂无链接</p></div>';
             if (linkCount) linkCount.textContent = '0 个友邻';
             return;
         }

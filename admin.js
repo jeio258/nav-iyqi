@@ -168,7 +168,7 @@ async function saveLinksToServer() {
 function renderLinks(links) {
     const linkList = document.getElementById('linkList');
     if (!links || links.length === 0) {
-        linkList.innerHTML = '<li style="text-align: center; padding: 3rem; color: var(--text-secondary);"><p>📭 暂无链接，点击"添加"按钮创建</p></li>';
+        linkList.innerHTML = '<li style="text-align: center; padding: 3rem; color: var(--color-ink-2);"><p>📭 暂无链接，点击"添加"按钮创建</p></li>';
         return;
     }
     linkList.innerHTML = links.map(link => `
@@ -224,7 +224,7 @@ function showLoginPanel() {
 }
 
 async function refreshLinks() {
-    document.getElementById('linkList').innerHTML = '<li style="text-align: center; padding: 2rem; color: var(--text-secondary);">加载中...</li>';
+    document.getElementById('linkList').innerHTML = '<li style="text-align: center; padding: 2rem; color: var(--color-ink-2);">加载中...</li>';
     const links = await loadLinksFromServer();
     renderLinks(links);
 }
