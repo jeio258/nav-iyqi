@@ -219,8 +219,8 @@
         }
         .btn-secondary:hover { border-color: var(--color-accent); background: var(--color-accent-soft); }
 
-        .btn-danger { background: var(--color-danger); color: #fff; }
-        .btn-danger:hover { background: oklch(42% 0.19 25); }
+        .btn-danger { background: transparent; border: 1px solid var(--color-danger); color: var(--color-danger); }
+        .btn-danger:hover { background: oklch(50% 0.18 25 / 0.1); border-color: var(--color-danger); }
 
         .btn-success { background: var(--color-success); color: #fff; }
         .btn-success:hover { background: oklch(48% 0.17 160); }
@@ -338,8 +338,9 @@
             font-weight: 500;
         }
 
-        .alert-error { background: oklch(50% 0.18 25 / 0.1); color: var(--color-danger); border: 1px solid var(--color-danger); }
-        .alert-success { background: oklch(55% 0.16 160 / 0.1); color: var(--color-success); border: 1px solid var(--color-success); }
+        .alert { display: none; }
+        .alert-error { background: oklch(50% 0.18 25 / 0.1); color: var(--color-danger); border: 1px solid var(--color-danger); display: none; }
+        .alert-success { background: oklch(55% 0.16 160 / 0.1); color: var(--color-success); border: 1px solid var(--color-success); display: none; }
 
         .section-title {
             display: flex;
