@@ -44,6 +44,7 @@ nav-iyqi/
 ├── admin.html          # 后台管理页面
 ├── admin.js            # 后台管理脚本
 ├── _worker.js          # Cloudflare Worker API
+├── .dev.vars.example   # 本地开发环境变量模板
 ├── wrangler.toml       # Cloudflare 部署配置
 ├── package.json        # 项目配置
 ├── LICENSE             # MIT 许可证
@@ -84,21 +85,40 @@ id = "你的KV_ID"
 
 ### 步骤 3：设置环境变量（⚠️ 必须，不可跳过）
 
-部署前**必须**设置三个 secret，否则 Worker 将拒绝启动：
+部署前**必须**设置三个 secret，否则 Worker 将拒绝启动。
+
+**本地开发：**
+
+```bash
+# 复制模板并填入实际值
+cp .dev.vars.example .dev.vars
+# 编辑 .dev.vars 填入你的用户名、密码和 JWT 密钥
+```
+
+**.dev.vars 内容：**
+```
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=你的密码
+JWT_SECRET=你的JWT密钥（至少32位）
+```
+
+**部署到 Cloudflare Pages：**
 
 ```bash
 # JWT 签名密钥（至少 32 位随机字符串）
-wrangler secret put JWT_SECRET
+wrangler pages secret put JWT_SECRET
 # 输入例如: openssl rand -base64 32 生成的字符串
 
 # 管理员密码
-wrangler secret put ADMIN_PASSWORD
+wrangler pages secret put ADMIN_PASSWORD
 # 输入你的密码
 
 # 管理员用户名
-wrangler secret put ADMIN_USERNAME
+wrangler pages secret put ADMIN_USERNAME
 # 输入你的用户名
 ```
+
+> ⚠️ 注意：Pages 项目必须用 `wrangler pages secret put`，**不是** `wrangler secret put`。
 
 ### 步骤 4：部署
 
@@ -239,6 +259,11 @@ curl -X PUT https://your-domain.com/api/links \
 ## 🧪 本地开发
 
 ```bash
+# 1. 创建本地环境变量文件（首次必须）
+cp .dev.vars.example .dev.vars
+# 编辑 .dev.vars 填入实际值
+
+# 2. 启动开发服务器
 wrangler pages dev .
 # 访问 http://localhost:8788
 ```
@@ -249,9 +274,13 @@ wrangler pages dev .
 
 ## 🐛 常见问题
 
-**Q: 部署后 Worker 报错 "缺少必需的环境变量"**
+**Q: 部署后 Worker 报错 / 登录提示"用户名或密码错误"**
 
-A: 必须通过 `wrangler secret put` 设置 `JWT_SECRET`、`ADMIN_PASSWORD`、`ADMIN_USERNAME`。项目不再包含默认值。
+A: 检查以下几点：
+1. 本地开发：确认已创建 `.dev.vars` 文件（`cp .dev.vars.example .dev.vars`）并填入了正确的值
+2. 部署环境：确认使用 `wrangler pages secret put`（不是 `wrangler secret put`）
+3. 验证 secret 已生效：`wrangler pages secret list`
+4. 在 Cloudflare Dashboard → Workers & Pages → 你的项目 → Settings → Environment variables 确认变量存在
 
 **Q: 后台管理页面无法登录**
 

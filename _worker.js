@@ -168,7 +168,7 @@ function getConfig(env) {
   const jwtSecret = env.JWT_SECRET;
 
   if (!username || !password || !jwtSecret) {
-    throw new Error('缺少必需的环境变量：ADMIN_USERNAME, ADMIN_PASSWORD, JWT_SECRET。请通过 wrangler secret put 设置。');
+    throw new Error('缺少必需的环境变量：ADMIN_USERNAME, ADMIN_PASSWORD, JWT_SECRET。本地开发：复制 .dev.vars.example 为 .dev.vars 并填入值。部署：使用 wrangler pages secret put 设置。');
   }
   return { username, password, jwtSecret };
 }
