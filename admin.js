@@ -331,7 +331,10 @@ function saveLink() {
 
     if (!name) { showStatus('modalAlert', '请输入链接名称', 'error'); return; }
     if (!url) { showStatus('modalAlert', '请输入链接地址', 'error'); return; }
-    try { new URL(url); } catch (e) { showStatus('modalAlert', '请输入有效的 URL 地址（以 http:// 或 https:// 开头）', 'error'); return; }
+    try {
+        var parsedUrl = new URL(url);
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') throw new Error('不支持的协议');
+    } catch (e) { showStatus('modalAlert', '请输入有效的 URL 地址（以 http:// 或 https:// 开头）', 'error'); return; }
 
     var links = getLinks();
     if (id) {

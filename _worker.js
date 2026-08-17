@@ -6,6 +6,12 @@ const rateLimiter = new Map();
 
 function checkRateLimit(ip, limit = 5, windowMs = 60000) {
   const now = Date.now();
+  // 定期清理过期条目，防止 Map 无限增长（内存泄漏）
+  if (rateLimiter.size > 1000) {
+    for (const [key, rec] of rateLimiter) {
+      if (now - rec.start > windowMs) rateLimiter.delete(key);
+    }
+  }
   const record = rateLimiter.get(ip);
   if (!record || now - record.start > windowMs) {
     rateLimiter.set(ip, { start: now, count: 1 });

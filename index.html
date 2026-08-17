@@ -7,6 +7,9 @@
 <meta name="description" content="临渊羡鱼个人导航页面">
 <meta name="theme-color" content="#f5ebe0">
 
+<!-- 内联 SVG favicon，避免 /favicon.ico 404 请求 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%BE%3C/text%3E%3C/svg%3E">
+
 <!-- 预连接：加速第三方资源 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,8 +17,9 @@
 <link rel="preconnect" href="https://t.alcy.cc">
 <link rel="dns-prefetch" href="https://v1.hitokoto.cn">
 
-<!-- 字体：异步加载不阻塞渲染 -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- 字体：非阻塞加载（media=print 技巧），不阻塞首屏渲染 -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <link rel="stylesheet" href="https://s4.zstatic.net/ajax/libs/lxgw-wenkai-webfont/1.7.0/lxgwwenkai-regular.min.css" media="print" onload="this.media='all'">
 
 <style>
@@ -107,7 +111,6 @@ body::before {
     background-position: center;
     background-repeat: no-repeat;
     background-attachment: fixed;
-    transition: background-image 1.2s ease-in-out, opacity 1.2s ease-in-out;
     opacity: 1;
 }
 
@@ -571,21 +574,55 @@ body .texture {
     const themeIcon = document.getElementById('themeIcon');
     const themeLabel = document.getElementById('themeLabel');
 
-    // ========== 加载链接（已含 XSS 防护） ==========
-    async function loadLinks() {
+    // ========== 加载链接（本地缓存 + 后台刷新，实现回访秒开） ==========
+    const CACHE_KEY = 'nav_links_cache';
+    const CACHE_TTL = 5 * 60 * 1000; // 5 分钟
+
+    function getCachedLinks() {
         try {
-            const response = await fetch(CONFIG.apiBase);
+            var raw = localStorage.getItem(CACHE_KEY);
+            if (!raw) return null;
+            var data = JSON.parse(raw);
+            if (!data || !Array.isArray(data.links)) return null;
+            if (Date.now() - data.ts > CACHE_TTL) return null;
+            return data.links;
+        } catch (e) { return null; }
+    }
+
+    function setCachedLinks(links) {
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ links: links, ts: Date.now() })); } catch (e) {}
+    }
+
+    async function loadLinks() {
+        var renderedFromCache = false;
+
+        // 1. 优先渲染本地缓存（若有），实现秒开
+        var cached = getCachedLinks();
+        if (cached && cached.length > 0) {
+            var activeCached = cached.filter(function(l) { return l.status === 'active'; });
+            if (activeCached.length > 0) {
+                renderLinks(activeCached);
+                renderedFromCache = true;
+            }
+        }
+
+        // 2. 后台拉取最新数据并刷新缓存
+        try {
+            var response = await fetch(CONFIG.apiBase);
             if (!response.ok) throw new Error('API 响应错误');
-            const data = await response.json();
+            var data = await response.json();
             if (data.links && data.links.length > 0) {
-                const active = data.links.filter(function(l) { return l.status === 'active'; });
+                setCachedLinks(data.links);
+                var active = data.links.filter(function(l) { return l.status === 'active'; });
                 renderLinks(active);
                 return;
             }
         } catch (e) {
-            console.warn('无法从 API 加载链接，使用默认链接:', e.message);
+            console.warn('无法从 API 加载链接:', e.message);
         }
-        renderLinks(CONFIG.defaultLinks);
+
+        // 3. 仅当没有缓存可用时才回退默认链接
+        if (!renderedFromCache) renderLinks(CONFIG.defaultLinks);
     }
 
     function renderLinks(links) {
@@ -670,8 +707,12 @@ body .texture {
         var s = String(diff % 60).padStart(2, '0');
         runtimeSpan.textContent = days + '天 ' + h + ':' + m + ':' + s;
     }
-    updateRuntime();
-    setInterval(updateRuntime, 1000);
+    // 对齐到下一秒边界执行，避免每 1000ms 空转
+    function scheduleRuntime() {
+        updateRuntime();
+        setTimeout(scheduleRuntime, 1000 - new Date().getMilliseconds());
+    }
+    scheduleRuntime();
 
     // ========== 一言（延迟启动） ==========
     var hitokotoTimer;
