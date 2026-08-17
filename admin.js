@@ -68,15 +68,21 @@ function clearToken() {
     localStorage.removeItem(TOKEN_KEY);
 }
 
+// 正确解码 base64url 格式的 JWT payload（-/_ 需要转换回 +//）
+function decodeJwtPayload(token) {
+    try {
+        var part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (part.length % 4) part += '=';
+        return JSON.parse(atob(part));
+    } catch (e) { return null; }
+}
+
 function isAuthenticated() {
     var token = getToken();
     if (!token) return false;
-    try {
-        var payload = JSON.parse(atob(token.split('.')[1]));
-        return payload.exp > Math.floor(Date.now() / 1000);
-    } catch (e) {
-        return false;
-    }
+    var payload = decodeJwtPayload(token);
+    if (!payload || !payload.exp) return false;
+    return payload.exp > Math.floor(Date.now() / 1000);
 }
 
 // 静默状态提示（替代弹窗 alert，符合 design.md "静默成功" 原则）
@@ -236,7 +242,20 @@ function renderLinks(links) {
     }
 }
 
-// ========== 站点设置 ==========
+// ========== 站点设置（localStorage 缓存 + 服务器同步） ==========
+async function loadSettingsFromServer() {
+    try {
+        var response = await fetch(API_BASE + '/settings');
+        if (!response.ok) return null;
+        var data = await response.json();
+        if (data.settings) {
+            saveSettingsLocal(data.settings); // 更新本地缓存
+            return data.settings;
+        }
+    } catch (e) {}
+    return null;
+}
+
 function loadSettingsToForm() {
     var settings = getSettings();
     document.getElementById('siteTitle').value = settings.title || '';
@@ -244,20 +263,56 @@ function loadSettingsToForm() {
     document.getElementById('siteStartDate').value = settings.startDate || '';
 }
 
-function saveSettingsToStore() {
+async function saveSettingsToStore() {
     var settings = {
         title: document.getElementById('siteTitle').value.trim(),
         subtitle: document.getElementById('siteSubtitle').value.trim(),
         startDate: document.getElementById('siteStartDate').value.trim()
     };
     saveSettingsLocal(settings);
-    // 静默成功
-    var alertEl = document.getElementById('settingsAlert');
-    if (alertEl) {
-        alertEl.textContent = '✅ 已保存';
-        alertEl.className = 'alert alert-success';
-        alertEl.style.display = 'block';
-        setTimeout(function() { alertEl.style.display = 'none'; }, 1500);
+
+    // 同步到服务器 KV（全部访客可见）
+    var token = getToken();
+    if (token) {
+        try {
+            var response = await fetch(API_BASE + '/settings', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({ settings: settings })
+            });
+            var data = await response.json();
+            if (!response.ok) throw new Error(data.error || '同步设置失败');
+            // 静默成功
+            var alertEl = document.getElementById('settingsAlert');
+            if (alertEl) {
+                alertEl.textContent = '✅ 已保存并同步到云端';
+                alertEl.className = 'alert alert-success';
+                alertEl.style.display = 'block';
+                setTimeout(function() { alertEl.style.display = 'none'; }, 1500);
+            }
+            return;
+        } catch (error) {
+            console.error('设置同步失败:', error.message);
+            var errEl = document.getElementById('settingsAlert');
+            if (errEl) {
+                errEl.textContent = '⚠️ 已存本地，云端同步失败';
+                errEl.className = 'alert alert-error';
+                errEl.style.display = 'block';
+                setTimeout(function() { errEl.style.display = 'none'; }, 3000);
+            }
+            return;
+        }
+    }
+    // 未登录：仅保存本地
+    var alertEl2 = document.getElementById('settingsAlert');
+    if (alertEl2) {
+        alertEl2.textContent = '✅ 已保存（本地）';
+        alertEl2.className = 'alert alert-success';
+        alertEl2.style.display = 'block';
+        setTimeout(function() { alertEl2.style.display = 'none'; }, 1500);
     }
 }
 
@@ -265,7 +320,16 @@ function showAdminPanel() {
     document.getElementById('loginPanel').style.display = 'none';
     document.getElementById('adminPanel').style.display = 'block';
     refreshLinks();
-    loadSettingsToForm();
+    // 先尝试从服务器加载设置，失败则用本地缓存
+    loadSettingsFromServer().then(function(serverSettings) {
+        if (serverSettings) {
+            document.getElementById('siteTitle').value = serverSettings.title || '';
+            document.getElementById('siteSubtitle').value = serverSettings.subtitle || '';
+            document.getElementById('siteStartDate').value = serverSettings.startDate || '';
+        } else {
+            loadSettingsToForm();
+        }
+    });
 }
 
 function showLoginPanel() {

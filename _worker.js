@@ -28,10 +28,11 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// 存储时只做截断/校验，不做 HTML 转义（转义应在渲染端进行，否则会双重转义）
 function sanitizeLink(link) {
   return {
-    id: String(link.id || ''),
-    name: escapeHtml(String(link.name || '').substring(0, 200)),
+    id: String(link.id || '').substring(0, 100),
+    name: String(link.name || '').substring(0, 200),
     url: String(link.url || '').substring(0, 2048),
     fallback: String(link.fallback || '').substring(0, 10),
     status: link.status === 'inactive' ? 'inactive' : 'active',
@@ -229,7 +230,10 @@ router.post('/api/auth/login', async (ctx) => {
     return new Response(JSON.stringify({ error: '服务器未正确配置，请联系管理员' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
   }
 
-  const ip = ctx.req.header('CF-Connecting-IP') || ctx.req.header('X-Forwarded-For') || 'unknown';
+  const ip = ctx.req.header('CF-Connecting-IP') || 'unknown';
+  // 注意：仅用 CF-Connecting-IP（Cloudflare 设置，客户端无法伪造），
+  // 不用 X-Forwarded-For（可被客户端伪造绕过限制）。
+  // 内存限制器按 isolate 生效，跨 isolate 需改用 KV/Durable Object。
   if (!checkRateLimit(ip, 8, 60000)) {
     console.warn('[Worker] 登录速率限制触发:', ip);
     return new Response(JSON.stringify({ error: '请求过于频繁，请稍后再试' }), { status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '60' } });
@@ -327,10 +331,10 @@ router.put('/api/settings', authMiddleware, async (ctx) => {
     if (!settings || typeof settings !== 'object') {
       return new Response(JSON.stringify({ error: '无效的数据格式' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
     }
-    // 清理设置值
+    // 清理设置值（截断校验；HTML 转义在渲染端进行）
     const cleaned = {
-      title: escapeHtml(String(settings.title || '').substring(0, 100)),
-      subtitle: escapeHtml(String(settings.subtitle || '').substring(0, 200)),
+      title: String(settings.title || '').substring(0, 100),
+      subtitle: String(settings.subtitle || '').substring(0, 200),
       startDate: String(settings.startDate || '').substring(0, 50)
     };
     if (ctx.env.NAV_LINKS) {

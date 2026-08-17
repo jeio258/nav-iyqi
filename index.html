@@ -43,14 +43,20 @@
     --color-accent-soft: oklch(58% 0.16 62 / 0.12);
     --color-focus:       oklch(52% 0.18 55);
 
-    --space-xs: 0.5rem;   --space-sm: 0.75rem;  --space-md: 1rem;
-    --space-lg: 1.5rem;   --space-xl: 2.5rem;
+    --space-3xs: 0.125rem; --space-2xs: 0.25rem; --space-xs: 0.5rem;
+    --space-sm: 0.75rem;  --space-md: 1rem;      --space-lg: 1.5rem;
+    --space-xl: 2.5rem;   --space-2xl: 4rem;      --space-3xl: 6rem;
 
-    --text-sm: 0.875rem;  --text-base: 1rem;    --text-md: 1.125rem;
-    --text-lg: 1.375rem;  --text-xl: 1.75rem;
+    --text-xs: 0.75rem;   --text-sm: 0.875rem;    --text-base: 1rem;
+    --text-md: 1.125rem;  --text-lg: 1.375rem;    --text-xl: 1.75rem;
+    --text-2xl: 2.25rem;  --text-3xl: 2.75rem;    --text-display: clamp(2rem, 5vw, 3.5rem);
 
     --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --dur-short: 220ms;
+    --ease-in:  cubic-bezier(0.7, 0, 0.84, 0);
+    --dur-micro: 120ms;   --dur-short: 220ms;     --dur-long: 420ms;
+
+    --color-success: oklch(55% 0.16 160);
+    --color-danger:  oklch(50% 0.18 25);
 
     --card-bg: oklch(97% 0.012 80 / 0.82);
     --card-bg-solid: oklch(97% 0.012 80 / 0.95);
@@ -74,6 +80,9 @@
     --color-accent-hover:oklch(60% 0.15 63);
     --color-accent-soft: oklch(68% 0.14 65 / 0.10);
     --color-focus:       oklch(65% 0.16 58);
+
+    --color-success: oklch(60% 0.14 160);
+    --color-danger:  oklch(58% 0.16 25);
 
     --card-bg: oklch(19% 0.012 68 / 0.82);
     --card-bg-solid: oklch(19% 0.012 68 / 0.95);
@@ -692,7 +701,7 @@ body .texture {
         } catch(e) {}
         return CONFIG.startDate;
     }
-    var startDate = new Date(getStartDate());
+    var startDate = new Date(getStartDate().replace(' ', 'T'));
 
     function updateRuntime() {
         if (!runtimeSpan) return;
@@ -784,14 +793,38 @@ body .texture {
 
     // ========== 初始化（关键路径优先） ==========
     loadLinks();
-    try {
-        var s = localStorage.getItem(CONFIG.settingsStorageKey);
-        if (s) {
-            var p = JSON.parse(s);
-            if (p.title) document.querySelector('.page-header h1').textContent = p.title;
-            if (p.subtitle) document.querySelector('.subtitle-text').textContent = p.subtitle;
-        }
-    } catch(e) {}
+    applyLocalSettings();
+    loadServerSettings();
+
+    // 应用本地缓存的站点设置
+    function applyLocalSettings() {
+        try {
+            var s = localStorage.getItem(CONFIG.settingsStorageKey);
+            if (s) {
+                var p = JSON.parse(s);
+                if (p.title) document.querySelector('.page-header h1').textContent = p.title;
+                if (p.subtitle) document.querySelector('.subtitle-text').textContent = p.subtitle;
+            }
+        } catch(e) {}
+    }
+
+    // 从服务器加载站点设置（云端优先，成功后更新本地缓存）
+    function loadServerSettings() {
+        fetch('/api/settings')
+            .then(function(r) { if (!r.ok) throw new Error(''); return r.json(); })
+            .then(function(data) {
+                if (!data.settings) throw new Error('');
+                var p = data.settings;
+                if (p.title) document.querySelector('.page-header h1').textContent = p.title;
+                if (p.subtitle) document.querySelector('.subtitle-text').textContent = p.subtitle;
+                if (p.startDate) {
+                    try { localStorage.setItem(CONFIG.settingsStorageKey, JSON.stringify(p)); } catch(e) {}
+                    startDate = new Date(String(p.startDate).replace(' ', 'T'));
+                    updateRuntime();
+                }
+            })
+            .catch(function() { /* 服务器不可用时保留本地设置 */ });
+    }
 
     window.addEventListener('beforeunload', function() {
         if (hitokotoTimer) clearInterval(hitokotoTimer);
