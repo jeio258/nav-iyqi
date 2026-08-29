@@ -527,18 +527,12 @@ body .texture {
             </div>
         </div>
         <div class="footer-right">
-            <a href="/admin" class="admin-link">管理</a>
+            <a href="/admin.html" class="admin-link">管理</a>
         </div>
     </footer>
 
 <script>
 (function() {
-    // ========== XSS 防护（核心安全函数） ==========
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-
     // ========== 配置 ==========
     const CONFIG = {
         startDate: '2025-12-01 00:00:00',
@@ -564,12 +558,12 @@ body .texture {
             '🌱 路漫漫其修远兮，吾将上下而求索。'
         ],
         defaultLinks: [
-            { name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临' },
-            { name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图' },
-            { name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁' },
-            { name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮' },
-            { name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦' },
-            { name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️' }
+            { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active', order: 0 },
+            { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active', order: 1 },
+            { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active', order: 2 },
+            { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active', order: 3 },
+            { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active', order: 4 },
+            { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active', order: 5 }
         ]
     };
 
@@ -642,22 +636,52 @@ body .texture {
         }
         if (linkCount) linkCount.textContent = links.length + ' 个友邻';
 
-        // 使用 textContent 方式避免 XSS：构建 DOM 而非 innerHTML 拼接
-        var html = '';
+        // 使用 DOM API + textContent 构建，杜绝 innerHTML/引号注入类 XSS（E1 修复）
+        linksContainer.innerHTML = '';
+        var frag = document.createDocumentFragment();
         for (var i = 0; i < links.length; i++) {
-            var link = links[i];
-            var name = escapeHtml(link.name);
-            var url = escapeHtml(link.url);
-            var fallback = escapeHtml(link.fallback || link.name.charAt(0));
-            html += '<a href="' + url + '" class="pill-link" target="_blank" rel="noopener noreferrer" role="listitem" title="' + name + '" style="animation-delay:' + (0.06 * i).toFixed(2) + 's">' +
-                '<span class="link-avatar">' +
-                    '<img src="https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(link.url) + '" alt="" loading="lazy" decoding="async" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">' +
-                    '<span class="fallback-text" style="display:none;">' + fallback + '</span>' +
-                '</span>' +
-                '<span>' + name + '</span>' +
-            '</a>';
+            var link = links[i] || {};
+            var name = String(link.name || '');
+            var url = String(link.url || '');
+            var fallbackText = String(link.fallback || name.charAt(0) || '🔗');
+            var delay = (0.06 * i).toFixed(2) + 's';
+
+            var a = document.createElement('a');
+            a.className = 'pill-link';
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.setAttribute('role', 'listitem');
+            a.title = name;
+            a.style.animationDelay = delay;
+
+            var avatar = document.createElement('span');
+            avatar.className = 'link-avatar';
+
+            // 图标加载失败时回退到文字，使用 addEventListener 而非内联 onerror
+            var img = document.createElement('img');
+            img.src = 'https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(url);
+            img.alt = '';
+            img.loading = 'lazy';
+            img.decoding = 'async';
+            img.onerror = function() { img.style.display = 'none'; fallbackSpan.style.display = 'flex'; };
+
+            var fallbackSpan = document.createElement('span');
+            fallbackSpan.className = 'fallback-text';
+            fallbackSpan.style.display = 'none';
+            fallbackSpan.textContent = fallbackText;
+
+            avatar.appendChild(img);
+            avatar.appendChild(fallbackSpan);
+
+            var nameSpan = document.createElement('span');
+            nameSpan.textContent = name;
+
+            a.appendChild(avatar);
+            a.appendChild(nameSpan);
+            frag.appendChild(a);
         }
-        linksContainer.innerHTML = html;
+        linksContainer.appendChild(frag);
     }
 
     // ========== 背景淡入淡出轮转（延迟启动，不阻塞首屏） ==========
@@ -815,11 +839,13 @@ body .texture {
             .then(function(data) {
                 if (!data.settings) throw new Error('');
                 var p = data.settings;
+                // 无论是否含 startDate，都将服务器设置写回本地缓存，保证回访时优先用服务器值（E3 修复）
+                try { localStorage.setItem(CONFIG.settingsStorageKey, JSON.stringify(p)); } catch(e) {}
                 if (p.title) document.querySelector('.page-header h1').textContent = p.title;
                 if (p.subtitle) document.querySelector('.subtitle-text').textContent = p.subtitle;
-                if (p.startDate) {
-                    try { localStorage.setItem(CONFIG.settingsStorageKey, JSON.stringify(p)); } catch(e) {}
-                    startDate = new Date(String(p.startDate).replace(' ', 'T'));
+                var sd = String(p.startDate || '');
+                if (sd) {
+                    startDate = new Date(sd.replace(' ', 'T'));
                     updateRuntime();
                 }
             })

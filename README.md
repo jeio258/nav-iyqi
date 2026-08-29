@@ -268,7 +268,7 @@ wrangler pages dev .
 # 访问 http://localhost:8788
 ```
 
-> 本地开发时 KV 存储不可用，将使用默认链接数据。
+> 本地开发（`wrangler pages dev .`）：wrangler 会自动提供本地 KV 模拟（受 `wrangler.toml` 中 `[[kv_namespaces]]` 绑定影响）。若 KV 未配置或导出失败，将回退到默认链接数据。
 
 ---
 

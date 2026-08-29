@@ -28,6 +28,14 @@ function escapeHtml(str) {
 }
 
 // ========== 工具函数 ==========
+// URL 校验：仅允许 http/https（与 _worker.js 的 isValidUrl 保持同一逻辑形态）
+function isValidUrl(str) {
+    try {
+        var parsedUrl = new URL(str);
+        return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+    } catch (e) { return false; }
+}
+
 function getLinks() {
     var stored = localStorage.getItem(LINKS_STORAGE_KEY);
     if (stored) {
@@ -177,10 +185,57 @@ async function autoSaveToServer(links) {
     }
 }
 
+// ========== 自动保存队列（串行 + 防抖，消除并发 PUT 乱序覆盖的竞态） ==========
+// 核心：始终只发送「最新」快照，且同一时刻最多一个 PUT 在途。
+// 这样无论快速「添加→编辑→删除」多少次，最终 KV 状态都等于最新本地状态，
+// 不会出现旧写覆盖新写。
+var _pendingSave = null;   // 最新待保存快照（null = 无待写）
+var _saving = false;       // 是否有 PUT 进行中
+var _saveTimer = null;     // 防抖定时器
+
+// 触发一次自动保存：更新最新快照；若已排定防抖或已有写入在途，则合并/续传
+function scheduleAutoSave(links) {
+    _pendingSave = links;          // 始终保留最新状态
+    if (_saving) return;           // 写进行中 → 其 finally 会自动续传最新快照
+    if (_saveTimer) return;        // 防抖已排定，合并本次更新
+    _saveTimer = setTimeout(function() {
+        _saveTimer = null;
+        _flushSaveQueue();
+    }, 300);
+}
+
+// 串行发送待写快照（递归续传直至队列空）
+function _flushSaveQueue() {
+    if (_saving) return;
+    if (_pendingSave === null) return;
+    var snapshot = _pendingSave;
+    _pendingSave = null;
+    _saving = true;
+    autoSaveToServer(snapshot).finally(function() {
+        _saving = false;
+        if (_pendingSave !== null) _flushSaveQueue(); // 期间有新变更 → 继续串行
+    });
+}
+
+// 等待所有待写排空（供手动「同步」按钮使用，避免手动写与自动写交错乱序）
+function flushAutoSave() {
+    if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = null; }
+    if (!_saving && _pendingSave === null) return Promise.resolve();
+    return new Promise(function(resolve) {
+        var tries = 0;
+        var id = setInterval(function() {
+            if (!_saving && _pendingSave === null) { clearInterval(id); resolve(); }
+            else if (++tries > 100) { clearInterval(id); resolve(); } // 安全上限 10s
+        }, 100);
+    });
+}
+
 // ========== 手动保存 ==========
 async function saveLinksToServer() {
     var token = getToken();
     if (!token) { showStatus('saveAlert', '登录已过期，请重新登录', 'error'); clearToken(); showLoginPanel(); return; }
+    // 先等待自动保存队列排空，确保手动写发生在所有自动写之后（不被打乱顺序）
+    await flushAutoSave();
     var links = getLinks();
     try {
         var response = await fetch(API_BASE + '/links', {
@@ -207,38 +262,65 @@ function renderLinks(links) {
         linkList.innerHTML = '<li style="text-align: center; padding: 3rem; color: var(--color-ink-2);"><p>📭 暂无链接，点击"添加"按钮创建</p></li>';
         return;
     }
-    var html = '';
+    linkList.innerHTML = '';
     for (var i = 0; i < links.length; i++) {
-        var link = links[i];
-        var name = escapeHtml(link.name);
-        var url = escapeHtml(link.url);
-        var fallback = escapeHtml(link.fallback || '🔗');
-        var statusBadge = link.status === 'inactive'
-            ? '<span class="badge badge-inactive">已禁用</span>'
-            : '<span class="badge badge-active">启用中</span>';
-        html += '<li class="link-item" data-id="' + escapeHtml(link.id) + '">' +
-            '<div class="link-info">' +
-                '<div class="link-avatar">' + fallback + '</div>' +
-                '<div class="link-details">' +
-                    '<h4>' + name + ' ' + statusBadge + '</h4>' +
-                    '<span>' + url + '</span>' +
-                '</div>' +
-            '</div>' +
-            '<div class="link-actions">' +
-                '<button class="btn btn-secondary btn-sm edit-btn" data-id="' + escapeHtml(link.id) + '">✏️ 编辑</button>' +
-                '<button class="btn btn-danger btn-sm delete-btn" data-id="' + escapeHtml(link.id) + '">🗑️ 删除</button>' +
-            '</div>' +
-        '</li>';
-    }
-    linkList.innerHTML = html;
+        var link = links[i] || {};
+        var id = String(link.id || '');
+        var name = String(link.name || '');
+        var url = String(link.url || '');
+        var fallbackText = String(link.fallback || '🔗');
+        var isInactive = link.status === 'inactive';
 
-    var editBtns = document.querySelectorAll('.edit-btn');
-    for (var j = 0; j < editBtns.length; j++) {
-        editBtns[j].addEventListener('click', function() { openEditModal(this.dataset.id); });
-    }
-    var deleteBtns = document.querySelectorAll('.delete-btn');
-    for (var k = 0; k < deleteBtns.length; k++) {
-        deleteBtns[k].addEventListener('click', function() { openDeleteModal(this.dataset.id); });
+        // 使用 DOM API + textContent 构建，杜绝 innerHTML/引号注入类 XSS（E1 修复）
+        var li = document.createElement('li');
+        li.className = 'link-item';
+        li.setAttribute('data-id', id);
+
+        var info = document.createElement('div');
+        info.className = 'link-info';
+
+        var avatar = document.createElement('div');
+        avatar.className = 'link-avatar';
+        avatar.textContent = fallbackText;
+
+        var details = document.createElement('div');
+        details.className = 'link-details';
+
+        var h4 = document.createElement('h4');
+        h4.textContent = name;
+        var badge = document.createElement('span');
+        badge.className = isInactive ? 'badge badge-inactive' : 'badge badge-active';
+        badge.textContent = isInactive ? '已禁用' : '启用中';
+        h4.appendChild(badge);
+
+        var urlSpan = document.createElement('span');
+        urlSpan.textContent = url;
+
+        details.appendChild(h4);
+        details.appendChild(urlSpan);
+        info.appendChild(avatar);
+        info.appendChild(details);
+
+        var actions = document.createElement('div');
+        actions.className = 'link-actions';
+
+        var editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-secondary btn-sm edit-btn';
+        editBtn.setAttribute('data-id', id);
+        editBtn.textContent = '✏️ 编辑';
+        editBtn.addEventListener('click', function() { openEditModal(this.dataset.id); });
+
+        var deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn btn-danger btn-sm delete-btn';
+        deleteBtn.setAttribute('data-id', id);
+        deleteBtn.textContent = '🗑️ 删除';
+        deleteBtn.addEventListener('click', function() { openDeleteModal(this.dataset.id); });
+
+        actions.appendChild(editBtn);
+        actions.appendChild(deleteBtn);
+        li.appendChild(info);
+        li.appendChild(actions);
+        linkList.appendChild(li);
     }
 }
 
@@ -395,10 +477,7 @@ function saveLink() {
 
     if (!name) { showStatus('modalAlert', '请输入链接名称', 'error'); return; }
     if (!url) { showStatus('modalAlert', '请输入链接地址', 'error'); return; }
-    try {
-        var parsedUrl = new URL(url);
-        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') throw new Error('不支持的协议');
-    } catch (e) { showStatus('modalAlert', '请输入有效的 URL 地址（以 http:// 或 https:// 开头）', 'error'); return; }
+    if (!isValidUrl(url)) { showStatus('modalAlert', '请输入有效的 URL 地址（以 http:// 或 https:// 开头）', 'error'); return; }
 
     var links = getLinks();
     if (id) {
@@ -420,7 +499,7 @@ function saveLink() {
     saveLinks(links);
     closeModal('linkModal');
     renderLinks(links);
-    autoSaveToServer(links);
+    scheduleAutoSave(links);
 }
 
 // ========== 删除链接（自动同步 KV） ==========
@@ -439,7 +518,7 @@ function deleteLink() {
     closeModal('deleteModal');
     renderLinks(newLinks);
     if (deletedLink) console.log('已删除链接:', deletedLink.name);
-    autoSaveToServer(newLinks);
+    scheduleAutoSave(newLinks);
 }
 
 // ========== 主题切换（与 index.html 统一） ==========
