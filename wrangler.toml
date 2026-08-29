@@ -7,5 +7,4 @@ pages_build_output_dir = "."
 # KV 绑定（本地 dev + 部署均生效）
 [[kv_namespaces]]
 binding = "NAV_LINKS"
-# ⚠️ 请用 `wrangler kv:namespace create NAV_LINKS` 输出的 id 替换（勿提交真实 id 到公网仓库）
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "494098d6917f4d23a7a240795bfb60dd"
