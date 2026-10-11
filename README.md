@@ -21,6 +21,8 @@
 - 💾 增删改自动同步到 KV（串行 + 防抖队列，消除并发写竞态）
 - 📱 响应式设计，适配移动端
 - ⚡ 延迟加载优化：首屏优先，背景/一言异步
+- 🔤 字体自托管（Inter/JetBrains Mono，本地 woff2，走 CF CDN）
+- 🖼️ 图标代理自托管（`/api/favicon`，KV 缓存 7 天，摆脱慢外部图标源）
 
 ---
 
@@ -203,6 +205,7 @@ hitokotoInterval: 10000,   // 一言刷新间隔（毫秒）
 | PUT | `/api/links` | 更新链接列表 | ✅ | - |
 | GET | `/api/settings` | 获取站点设置 | ❌ | - |
 | PUT | `/api/settings` | 更新站点设置 | ✅ | - |
+| GET | `/api/favicon?url=` | 站点图标代理（KV 缓存 7 天） | ❌ | - |
 | GET | `/api/health` | 健康检查 | ❌ | - |
 
 ### 登录

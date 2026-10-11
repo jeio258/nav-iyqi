@@ -140,7 +140,16 @@ class Router {
         }
       }
     }
-    try { return env.ASSETS.fetch(request); } catch (e) { return new Response('Not Found', { status: 404 }); }
+    try {
+      const resp = await env.ASSETS.fetch(request);
+      // 静态资源设置缓存头：HTML 短缓存（设置/链接由前端异步拉取，HTML 本身静态），字体/图片长缓存
+      const url = new URL(request.url);
+      const path = url.pathname;
+      const cacheMax = /\/fonts\/|favicon/.test(path) ? 31536000 : 300;
+      const headers = new Headers(resp.headers);
+      headers.set('Cache-Control', 'public, max-age=' + cacheMax);
+      return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers });
+    } catch (e) { return new Response('Not Found', { status: 404 }); }
   }
 
   matchPath(routePath, requestPath) {
@@ -306,6 +315,48 @@ router.put('/api/links', authMiddleware, async (ctx) => {
   } catch (error) {
     console.error('[Worker] 保存链接失败:', error.message);
     return new Response(JSON.stringify({ error: '保存失败' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+});
+
+// ========== 站点图标代理（避免前端直接依赖慢的外部图标源） ==========
+// 首次访问抓取目标站 favicon，存入 KV（7 天 TTL），后续由边缘直接返回
+router.get('/api/favicon', async (ctx) => {
+  const target = ctx.req.raw ? new URL(ctx.req.raw.url).searchParams.get('url') : '';
+  const u = target ? new URL(target) : null;
+  if (!u || (u.protocol !== 'http:' && u.protocol !== 'https:')) {
+    return new Response('Bad Request', { status: 400 });
+  }
+  const domain = u.hostname;
+  const key = 'favicon:' + domain;
+
+  try {
+    // 1. KV 命中直接返回
+    if (ctx.env.NAV_LINKS) {
+      const cached = await ctx.env.NAV_LINKS.get(key);
+      if (cached) {
+        const buf = Uint8Array.from(atob(cached), c => c.charCodeAt(0));
+        return new Response(buf, { headers: { 'Content-Type': 'image/x-icon', 'Cache-Control': 'public, max-age=604800' } });
+      }
+    }
+    // 2. 未命中：从 Google 官方 favicon 服务抓取（稳定且响应快），5s 超时防止上游挂起
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 5000);
+    let resp;
+    try {
+      resp = await fetch('https://www.google.com/s2/favicons?domain=' + domain + '&sz=64', { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: ctrl.signal });
+    } finally { clearTimeout(tid); }
+    if (!resp.ok) throw new Error('favicon fetch failed: ' + resp.status);
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    // 3. 写回 KV 缓存（base64 编码，7 天）
+    if (ctx.env.NAV_LINKS && buf.length < 1024 * 1024) {
+      let bin = '';
+      for (const b of buf) bin += String.fromCharCode(b);
+      await ctx.env.NAV_LINKS.put(key, btoa(bin), { expirationTtl: 604800 });
+    }
+    return new Response(buf, { headers: { 'Content-Type': 'image/x-icon', 'Cache-Control': 'public, max-age=604800' } });
+  } catch (error) {
+    console.warn('[Worker] 图标获取失败:', domain, error.message);
+    return new Response('Not Found', { status: 404 });
   }
 });
 

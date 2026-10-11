@@ -11,15 +11,12 @@
 <link rel="icon" href="https://q1.qlogo.cn/g?b=qq&nk=2847495839&s=640">
 
 <!-- 预连接：加速第三方资源 -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="preconnect" href="https://faviconsnap.com">
 <link rel="preconnect" href="https://t.alcy.cc">
 <link rel="dns-prefetch" href="https://v1.hitokoto.cn">
 
-<!-- 字体：非阻塞加载（media=print 技巧），不阻塞首屏渲染 -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<!-- 字体：本地自托管 Inter/JetBrains Mono（非阻塞加载），LXGW WenKai 走国内 CDN -->
+<link rel="stylesheet" href="/fonts/fonts.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="/fonts/fonts.css"></noscript>
 <link rel="stylesheet" href="https://s4.zstatic.net/ajax/libs/lxgw-wenkai-webfont/1.7.0/lxgwwenkai-regular.min.css" media="print" onload="this.media='all'">
 
 <style>
@@ -658,9 +655,9 @@ body .texture {
             var avatar = document.createElement('span');
             avatar.className = 'link-avatar';
 
-            // 图标加载失败时回退到文字（let 确保每次迭代独立绑定，闭包引用当前元素）
+            // 图标走本地 Worker 代理（KV 缓存 7 天，避免直接依赖慢的外部图标源）
             let img = document.createElement('img');
-            img.src = 'https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(url);
+            img.src = '/api/favicon?url=' + encodeURIComponent(url);
             img.alt = '';
             img.loading = 'lazy';
             img.decoding = 'async';
