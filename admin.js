@@ -7,12 +7,12 @@ var THEME_KEY = 'theme';
 
 // 默认链接数据
 var DEFAULT_LINKS = [
-    { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active', order: 0 },
-    { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active', order: 1 },
-    { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active', order: 2 },
-    { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active', order: 3 },
-    { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active', order: 4 },
-    { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active', order: 5 }
+    { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active' },
+    { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active' },
+    { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active' },
+    { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active' },
+    { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active' },
+    { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active' }
 ];
 
 var DEFAULT_SETTINGS = {
@@ -20,12 +20,6 @@ var DEFAULT_SETTINGS = {
     subtitle: '临渊羡鱼 · 且行且歌',
     startDate: '2025-12-01 00:00:00'
 };
-
-// ========== XSS 防护 ==========
-function escapeHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
 
 // ========== 工具函数 ==========
 // URL 校验：仅允许 http/https（与 _worker.js 的 isValidUrl 保持同一逻辑形态）
@@ -493,7 +487,7 @@ function saveLink() {
             }
         }
     } else {
-        links.push({ id: generateId(), name: name, url: url, fallback: fallback || name.charAt(0), status: status, order: links.length });
+        links.push({ id: generateId(), name: name, url: url, fallback: fallback || name.charAt(0), status: status });
     }
 
     saveLinks(links);

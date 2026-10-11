@@ -558,12 +558,12 @@ body .texture {
             '🌱 路漫漫其修远兮，吾将上下而求索。'
         ],
         defaultLinks: [
-            { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active', order: 0 },
-            { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active', order: 1 },
-            { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active', order: 2 },
-            { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active', order: 3 },
-            { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active', order: 4 },
-            { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active', order: 5 }
+            { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active' },
+            { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active' },
+            { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active' },
+            { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active' },
+            { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active' },
+            { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active' }
         ]
     };
 
@@ -658,15 +658,15 @@ body .texture {
             var avatar = document.createElement('span');
             avatar.className = 'link-avatar';
 
-            // 图标加载失败时回退到文字，使用 addEventListener 而非内联 onerror
-            var img = document.createElement('img');
+            // 图标加载失败时回退到文字（let 确保每次迭代独立绑定，闭包引用当前元素）
+            let img = document.createElement('img');
             img.src = 'https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(url);
             img.alt = '';
             img.loading = 'lazy';
             img.decoding = 'async';
             img.onerror = function() { img.style.display = 'none'; fallbackSpan.style.display = 'flex'; };
 
-            var fallbackSpan = document.createElement('span');
+            let fallbackSpan = document.createElement('span');
             fallbackSpan.className = 'fallback-text';
             fallbackSpan.style.display = 'none';
             fallbackSpan.textContent = fallbackText;

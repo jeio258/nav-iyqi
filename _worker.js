@@ -35,8 +35,7 @@ function sanitizeLink(link) {
     name: String(link.name || '').substring(0, 200),
     url: String(link.url || '').substring(0, 2048),
     fallback: String(link.fallback || '').substring(0, 10),
-    status: link.status === 'inactive' ? 'inactive' : 'active',
-    order: Math.max(0, parseInt(link.order) || 0)
+    status: link.status === 'inactive' ? 'inactive' : 'active'
   };
 }
 
@@ -186,12 +185,12 @@ function getConfigSafe(env) {
 
 // ========== 数据默认值（仅 KV 不可用时使用） ==========
 const DEFAULT_LINKS = [
-  { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active', order: 0 },
-  { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active', order: 1 },
-  { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active', order: 2 },
-  { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active', order: 3 },
-  { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active', order: 4 },
-  { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active', order: 5 }
+  { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active' },
+  { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active' },
+  { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active' },
+  { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active' },
+  { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active' },
+  { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active' }
 ];
 
 const DEFAULT_SETTINGS = {
