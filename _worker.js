@@ -378,7 +378,7 @@ router.get('/api/favicon', async (ctx) => {
       const cached = await ctx.env.NAV_LINKS.get(key);
       if (cached) {
         const buf = Uint8Array.from(atob(cached), c => c.charCodeAt(0));
-        return new Response(buf, { headers: { 'Content-Type': detectImageType(buf), 'Cache-Control': 'public, max-age=604800' } });
+        return new Response(buf, { headers: { 'Content-Type': detectImageType(buf), 'Cache-Control': 'public, max-age=604800', 'X-Favicon-Source': 'kv' } });
       }
     }
     // 2. 未命中：抓取并写回 KV 缓存（base64 编码，7 天）
@@ -388,7 +388,7 @@ router.get('/api/favicon', async (ctx) => {
       for (const b of buf) bin += String.fromCharCode(b);
       await ctx.env.NAV_LINKS.put(key, btoa(bin), { expirationTtl: 604800 });
     }
-    return new Response(buf, { headers: { 'Content-Type': detectImageType(buf), 'Cache-Control': 'public, max-age=604800' } });
+    return new Response(buf, { headers: { 'Content-Type': detectImageType(buf), 'Cache-Control': 'public, max-age=604800', 'X-Favicon-Source': 'fetch' } });
   } catch (error) {
     console.warn('[Worker] 图标获取失败:', domain, error.message);
     return new Response('Not Found', { status: 404 });
