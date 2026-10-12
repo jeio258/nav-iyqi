@@ -633,7 +633,7 @@ body .texture {
         }
         if (linkCount) linkCount.textContent = links.length + ' 个友邻';
 
-        // 使用 DOM API + textContent 构建，杜绝 innerHTML/引号注入类 XSS（E1 修复）
+        // 使用 DOM API + textContent 构建，杜绝 innerHTML/引号注入类 XSS
         linksContainer.innerHTML = '';
         var frag = document.createDocumentFragment();
         for (var i = 0; i < links.length; i++) {
@@ -836,7 +836,7 @@ body .texture {
             .then(function(data) {
                 if (!data.settings) throw new Error('');
                 var p = data.settings;
-                // 无论是否含 startDate，都将服务器设置写回本地缓存，保证回访时优先用服务器值（E3 修复）
+                // 无论是否含 startDate，都将服务器设置写回本地缓存，保证回访时优先用服务器值
                 try { localStorage.setItem(CONFIG.settingsStorageKey, JSON.stringify(p)); } catch(e) {}
                 if (p.title) document.querySelector('.page-header h1').textContent = p.title;
                 if (p.subtitle) document.querySelector('.subtitle-text').textContent = p.subtitle;

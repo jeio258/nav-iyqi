@@ -265,7 +265,7 @@ function renderLinks(links) {
         var fallbackText = String(link.fallback || '🔗');
         var isInactive = link.status === 'inactive';
 
-        // 使用 DOM API + textContent 构建，杜绝 innerHTML/引号注入类 XSS（E1 修复）
+        // 使用 DOM API + textContent 构建，杜绝 innerHTML/引号注入类 XSS
         var li = document.createElement('li');
         li.className = 'link-item';
         li.setAttribute('data-id', id);
