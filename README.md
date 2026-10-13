@@ -45,12 +45,43 @@ nav-iyqi/
 ├── index.html          # 主导航页面
 ├── admin.html          # 后台管理页面
 ├── admin.js            # 后台管理脚本
-├── _worker.js          # Cloudflare Worker API
+├── _worker.js          # Cloudflare Worker API（Cloudflare 部署用）
+├── edge-functions/     # EdgeOne Makers 函数层（EdgeOne 部署用，自包含）
+│   └── api/            #   auth/links/settings/favicon/health 路由
+├── edgeone.json        # EdgeOne 静态缓存配置
+├── scripts/            # EdgeOne 函数生成器 + 本地模拟器
 ├── .dev.vars.example   # 本地开发环境变量模板
 ├── wrangler.toml       # Cloudflare 部署配置
 ├── package.json        # 项目配置
 ├── LICENSE             # MIT 许可证
 └── README.md           # 说明文档
+```
+
+---
+
+## ☁️ EdgeOne Makers 部署（备选平台）
+
+本项目同时支持部署到腾讯云 EdgeOne Makers（edgeone.makers 控制台），前端与 API 逻辑与 Cloudflare 版一致。
+
+### 目录约定
+
+- `edge-functions/api/*.js`：EdgeOne Edge Functions（自包含，每个文件一个路由，无需 import 共享模块）
+- `edgeone.json`：静态资源缓存头配置（fonts 长缓存、HTML 短缓存）
+- 函数文件由 `node scripts/build-edgeone.js` 从 `edge-functions/_shared.js` 生成；改共享逻辑后需重新生成
+
+### 部署步骤
+
+1. 在 EdgeOne Makers 控制台创建项目（直接上传或关联 Git 仓库）
+2. 上传/推送项目根目录（含 `index.html`、`admin.html`、`admin.js`、`fonts/`、`edge-functions/`、`edgeone.json`）
+3. 控制台创建 KV 命名空间并绑定到项目，**变量名填 `NAV_LINKS`**（代码按此全局变量访问）
+4. 设置环境变量 `ADMIN_USERNAME`、`ADMIN_PASSWORD`、`JWT_SECRET`
+5. 部署后访问站点验证
+
+### 本地模拟（不依赖官方 CLI）
+
+```bash
+node scripts/sim-edgeone.js 8099   # 模拟 EdgeOne 运行时 + KV + 静态资源
+# 访问 http://localhost:8099
 ```
 
 ---
