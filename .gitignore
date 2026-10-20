@@ -33,3 +33,6 @@ Thumbs.db
 *.pem
 *.key
 *.crt.dev.vars
+
+# 本地开发密钥（勿提交）
+.dev.vars
