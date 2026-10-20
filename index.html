@@ -768,8 +768,12 @@ body .texture {
         bgIndex = (bgIndex + 1) % CONFIG.bgImages.length;
     }
 
-    // 延迟启动背景轮转（优先首屏渲染）
-    setTimeout(initBackground, 300);
+    // 延迟启动背景轮转：load 事件后再加载，避免 t.alcy.cc 背景图（实测 6.5s）阻塞 Load 事件
+    if (document.readyState === 'complete') {
+        setTimeout(initBackground, 0);
+    } else {
+        window.addEventListener('load', function() { setTimeout(initBackground, 0); });
+    }
 
     // ========== 运行时间 ==========
     function getStartDate() {
