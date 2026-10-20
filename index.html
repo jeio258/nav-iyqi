@@ -644,6 +644,7 @@ body .texture {
 
         // 使用 textContent 方式避免 XSS：构建 DOM 而非 innerHTML 拼接
         var html = '';
+        var iconJobs = [];
         for (var i = 0; i < links.length; i++) {
             var link = links[i];
             var name = escapeHtml(link.name);
@@ -651,13 +652,55 @@ body .texture {
             var fallback = escapeHtml(link.fallback || link.name.charAt(0));
             html += '<a href="' + url + '" class="pill-link" target="_blank" rel="noopener noreferrer" role="listitem" title="' + name + '" style="animation-delay:' + (0.06 * i).toFixed(2) + 's">' +
                 '<span class="link-avatar">' +
-                    '<img src="https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(link.url) + '" alt="" loading="lazy" decoding="async" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">' +
-                    '<span class="fallback-text" style="display:none;">' + fallback + '</span>' +
+                    '<span class="fallback-text" style="display:flex;">' + fallback + '</span>' +
                 '</span>' +
                 '<span>' + name + '</span>' +
             '</a>';
+            iconJobs.push({ url: url, fallbackText: fallback });
         }
         linksContainer.innerHTML = html;
+        loadIconsSequentially(iconJobs);
+    }
+
+    // 图标限量并发加载（一次 2 个）：9 个图标同时请求会打满弱网连接池互相拖死（实测单图标可拖到 10s），
+    // 改为小并发按序加载，每个图标失败立即显示文字回退，不阻塞其余图标
+    function loadIconsSequentially(jobs) {
+        var avatars = document.querySelectorAll('.link-avatar');
+        var index = 0;
+        var CONCURRENCY = 2;
+
+        function next() {
+            if (index >= jobs.length) return;
+            var jobIdx = index++;
+            var job = jobs[jobIdx];
+            var avatar = avatars[jobIdx];
+            if (!avatar) return;
+            var img = document.createElement('img');
+            img.alt = '';
+            img.decoding = 'async';
+            var fallbackSpan = avatar.querySelector('.fallback-text');
+            var done = false;
+            var finish = function(ok) {
+                if (done) return;
+                done = true;
+                if (ok) {
+                    if (img.naturalWidth > 0) {
+                        img.style.display = 'block';
+                        fallbackSpan.style.display = 'none';
+                    }
+                }
+                next(); // 无论成败都继续队列
+            };
+            img.onload = function() { finish(true); };
+            img.onerror = function() { finish(false); };
+            // 超时保护：8s 内未加载完成视为失败，避免弱网下无限等待
+            setTimeout(function() { finish(false); }, 8000);
+            img.src = 'https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(job.url);
+            avatar.appendChild(img);
+        }
+
+        // 启动首批并发
+        for (var k = 0; k < CONCURRENCY; k++) next();
     }
 
     // ========== 背景淡入淡出轮转（延迟启动，不阻塞首屏） ==========
