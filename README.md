@@ -16,13 +16,11 @@
 - 🔗 导航链接云端管理（Cloudflare KV 持久化）
 - 📝 站点标题/副标题/建站日期自定义
 - 🔐 JWT 认证后台（速率限制 + 服务端验证）
-- 🛡️ 全链路 XSS 防护（DOM API + `textContent` 纯文本渲染，杜绝注入）
+- 🛡️ 全链路 XSS 防护 + 输入清理
 - ☁️ Cloudflare Pages + Workers 零服务器部署
-- 💾 增删改自动同步到 KV（串行 + 防抖队列，消除并发写竞态）
+- 💾 增删改自动同步到 KV
 - 📱 响应式设计，适配移动端
 - ⚡ 延迟加载优化：首屏优先，背景/一言异步
-- 🔤 字体自托管（Inter/JetBrains Mono，本地 woff2，走 CF CDN）
-- 🖼️ 图标代理自托管（`/api/favicon`，KV 缓存 7 天，摆脱慢外部图标源）
 
 ---
 
@@ -205,7 +203,6 @@ hitokotoInterval: 10000,   // 一言刷新间隔（毫秒）
 | PUT | `/api/links` | 更新链接列表 | ✅ | - |
 | GET | `/api/settings` | 获取站点设置 | ❌ | - |
 | PUT | `/api/settings` | 更新站点设置 | ✅ | - |
-| GET | `/api/favicon?url=` | 站点图标代理（KV 缓存 7 天） | ❌ | - |
 | GET | `/api/health` | 健康检查 | ❌ | - |
 
 ### 登录
@@ -243,7 +240,7 @@ curl -X PUT https://your-domain.com/api/links \
 |------|------|
 | JWT 认证 | HMAC-SHA256 签名，1 小时过期 |
 | 速率限制 | 登录接口 8次/分钟/IP，返回 429 |
-| XSS 防护 | 全链路 DOM API + `textContent` 纯文本渲染（杜绝标签/引号注入）；`_worker.js` 服务端输入清理 |
+| XSS 防护 | 全链路 escapeHtml()，输入截断清理 |
 | URL 校验 | 仅允许 http/https 协议 |
 | 环境变量加密 | 凭据通过 `wrangler secret` 加密存储 |
 | HTTPS | Cloudflare 自动提供 SSL 证书 |
@@ -271,7 +268,7 @@ wrangler pages dev .
 # 访问 http://localhost:8788
 ```
 
-> 本地开发（`wrangler pages dev .`）：wrangler 会自动提供本地 KV 模拟（受 `wrangler.toml` 中 `[[kv_namespaces]]` 绑定影响）。若 KV 未配置或导出失败，将回退到默认链接数据。
+> 本地开发时 KV 存储不可用，将使用默认链接数据。
 
 ---
 
@@ -300,16 +297,6 @@ A: Cloudflare Dashboard → Workers & Pages → KV → NAV_LINKS → 删除 `lin
 ---
 
 ## 🔄 更新日志
-
-### v1.1.1 (2026-08)
-
-- 🛡️ 前台/后台渲染链路重构：`renderLinks` 由 `innerHTML` 字符串拼接改为 DOM API + `textContent`，从根上杜绝引号/标签注入类 XSS
-- 🛡️ 自动保存改为「串行 + 防抖」队列：快速「添加→编辑→删除」不再产生并发 PUT 乱序覆盖，消除 KV 幽灵数据/丢失链接的竞态
-- 🔗 管理入口统一为 `/admin.html`，与文件名及文档一致
-- 📅 建站日期以服务器为准，本地缓存无条件回写
-- 🧹 移除无调用死代码，去重 `isValidUrl`，消除默认链接字段漂移
-- 📦 版本对齐 1.1.1；wrangler.toml KV 绑定恢复真实 id；.gitignore 补 `.dev.vars`
-- 📚 README 修正「本地 KV 不可用」与实现矛盾的表述
 
 ### v1.1.0 (2025-07)
 

@@ -35,7 +35,8 @@ function sanitizeLink(link) {
     name: String(link.name || '').substring(0, 200),
     url: String(link.url || '').substring(0, 2048),
     fallback: String(link.fallback || '').substring(0, 10),
-    status: link.status === 'inactive' ? 'inactive' : 'active'
+    status: link.status === 'inactive' ? 'inactive' : 'active',
+    order: Math.max(0, parseInt(link.order) || 0)
   };
 }
 
@@ -140,16 +141,7 @@ class Router {
         }
       }
     }
-    try {
-      const resp = await env.ASSETS.fetch(request);
-      // 静态资源设置缓存头：HTML 短缓存（设置/链接由前端异步拉取，HTML 本身静态），字体/图片长缓存
-      const url = new URL(request.url);
-      const path = url.pathname;
-      const cacheMax = /\/fonts\/|favicon/.test(path) ? 31536000 : 300;
-      const headers = new Headers(resp.headers);
-      headers.set('Cache-Control', 'public, max-age=' + cacheMax);
-      return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers });
-    } catch (e) { return new Response('Not Found', { status: 404 }); }
+    try { return env.ASSETS.fetch(request); } catch (e) { return new Response('Not Found', { status: 404 }); }
   }
 
   matchPath(routePath, requestPath) {
@@ -194,12 +186,12 @@ function getConfigSafe(env) {
 
 // ========== 数据默认值（仅 KV 不可用时使用） ==========
 const DEFAULT_LINKS = [
-  { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active' },
-  { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active' },
-  { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active' },
-  { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active' },
-  { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active' },
-  { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active' }
+  { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active', order: 0 },
+  { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active', order: 1 },
+  { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active', order: 2 },
+  { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active', order: 3 },
+  { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active', order: 4 },
+  { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active', order: 5 }
 ];
 
 const DEFAULT_SETTINGS = {
@@ -315,83 +307,6 @@ router.put('/api/links', authMiddleware, async (ctx) => {
   } catch (error) {
     console.error('[Worker] 保存链接失败:', error.message);
     return new Response(JSON.stringify({ error: '保存失败' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-  }
-});
-
-// ========== 站点图标代理（避免前端直接依赖慢的外部图标源） ==========
-// 阶段1：目标站自身 /favicon.ico（最准确，6s）；阶段2：并发 icon.horse → DuckDuckGo → Google（各 3s 兜底）；
-// 任一成功即存入 KV（7 天 TTL），后续由边缘直接返回
-const FAVICON_FALLBACKS = [
-  (d) => 'https://icon.horse/icon/' + d,
-  (d) => 'https://icons.duckduckgo.com/ip3/' + d + '.ico',
-  (d) => 'https://www.google.com/s2/favicons?domain=' + d + '&sz=64'
-];
-
-function detectImageType(buf) {
-  if (buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'image/png';
-  if (buf.length > 4 && buf[0] === 0x00 && buf[1] === 0x00 && buf[2] === 0x01 && buf[3] === 0x00) return 'image/x-icon';
-  if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
-  if (buf.length > 4 && buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return 'image/gif';
-  if (buf.length > 4 && buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46) return 'image/webp';
-  return 'application/octet-stream';
-}
-
-async function tryFetchFavicon(makeUrl, domain, timeoutMs) {
-  const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const resp = await fetch(makeUrl(domain), { headers: { 'User-Agent': 'Mozilla/5.0' }, redirect: 'follow', signal: ctrl.signal });
-    if (!resp.ok || resp.status >= 400) throw new Error('status ' + resp.status);
-    const ct = (resp.headers.get('content-type') || '').toLowerCase();
-    if (ct && !ct.includes('image')) throw new Error('not image: ' + ct);
-    const buf = new Uint8Array(await resp.arrayBuffer());
-    if (buf.length < 16) throw new Error('empty body');
-    return buf;
-  } finally { clearTimeout(tid); }
-}
-
-async function fetchFavicon(domain) {
-  // 阶段1：目标站自身 favicon（最准确），6s 超时
-  try {
-    return await tryFetchFavicon((d) => 'https://' + d + '/favicon.ico', domain, 6000);
-  } catch (e) {
-    console.warn('[Worker] 目标站自身图标失败:', domain, e.message);
-  }
-  // 阶段2：并发第三方兜底，各 3s
-  const results = await Promise.allSettled(FAVICON_FALLBACKS.map(src => tryFetchFavicon(src, domain, 3000)));
-  for (const r of results) if (r.status === 'fulfilled') return r.value;
-  throw new Error('all sources failed');
-}
-
-router.get('/api/favicon', async (ctx) => {
-  const target = ctx.req.raw ? new URL(ctx.req.raw.url).searchParams.get('url') : '';
-  const u = target ? new URL(target) : null;
-  if (!u || (u.protocol !== 'http:' && u.protocol !== 'https:')) {
-    return new Response('Bad Request', { status: 400 });
-  }
-  const domain = u.hostname;
-  const key = 'favicon:' + domain;
-
-  try {
-    // 1. KV 命中直接返回
-    if (ctx.env.NAV_LINKS) {
-      const cached = await ctx.env.NAV_LINKS.get(key);
-      if (cached) {
-        const buf = Uint8Array.from(atob(cached), c => c.charCodeAt(0));
-        return new Response(buf, { headers: { 'Content-Type': detectImageType(buf), 'Cache-Control': 'public, max-age=604800' } });
-      }
-    }
-    // 2. 未命中：抓取并写回 KV 缓存（base64 编码，7 天）
-    const buf = await fetchFavicon(domain);
-    if (ctx.env.NAV_LINKS && buf.length < 1024 * 1024) {
-      let bin = '';
-      for (const b of buf) bin += String.fromCharCode(b);
-      await ctx.env.NAV_LINKS.put(key, btoa(bin), { expirationTtl: 604800 });
-    }
-    return new Response(buf, { headers: { 'Content-Type': detectImageType(buf), 'Cache-Control': 'public, max-age=604800' } });
-  } catch (error) {
-    console.warn('[Worker] 图标获取失败:', domain, error.message);
-    return new Response('Not Found', { status: 404 });
   }
 });
 

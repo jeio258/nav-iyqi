@@ -15,10 +15,6 @@ build/
 # Wrangler
 .wrangler/
 
-# 防止本地开发/部署临时文件与密钥被误发布
-.git/
-*.dev.vars # 本地密钥（示例模板 .dev.vars.example 保留）
-
 # 日志
 *.log
 npm-debug.log*
@@ -37,5 +33,3 @@ Thumbs.db
 *.pem
 *.key
 *.crt
-# 本地开发环境变量（勿提交）
-.dev.vars
