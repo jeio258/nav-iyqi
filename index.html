@@ -11,15 +11,13 @@
 <link rel="icon" href="https://q1.qlogo.cn/g?b=qq&nk=2847495839&s=640">
 
 <!-- 预连接：加速第三方资源 -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://faviconsnap.com">
 <link rel="preconnect" href="https://t.alcy.cc">
 <link rel="dns-prefetch" href="https://v1.hitokoto.cn">
 
-<!-- 字体：非阻塞加载（media=print 技巧），不阻塞首屏渲染 -->
-<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<noscript><link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<!-- 字体：本地自托管（非阻塞加载，media=print 技巧），消除 Google Fonts 外链（国内慢/不稳） -->
+<link rel="stylesheet" href="/fonts/fonts.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="/fonts/fonts.css"></noscript>
 <link rel="stylesheet" href="https://s4.zstatic.net/ajax/libs/lxgw-wenkai-webfont/1.7.0/lxgwwenkai-regular.min.css" media="print" onload="this.media='all'">
 
 <style>
@@ -704,39 +702,36 @@ body .texture {
             var job = jobs[jobIdx];
             var avatar = avatars[jobIdx];
             if (!avatar || cache[job.url]) return next(); // 已缓存跳过
-            var img = document.createElement('img');
-            img.alt = '';
-            img.decoding = 'async';
             var fallbackSpan = avatar.querySelector('.fallback-text');
-            var done = false;
-            var finish = function(ok) {
-                if (done) return;
-                done = true;
-                if (ok && img.naturalWidth > 0) {
-                    img.style.display = 'block';
-                    if (fallbackSpan) fallbackSpan.style.display = 'none';
-                    // 存缓存：跨域图标用 fetch 抓二进制转 base64（canvas.toDataURL 会被跨域污染抛错，不能用）
-                    fetch('https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(job.url))
-                        .then(function(r) { return r.blob(); })
-                        .then(function(blob) {
-                            if (blob.size > 512 * 1024) return; // 超大不缓存
-                            var fr = new FileReader();
-                            fr.onload = function() {
-                                var b64 = String(fr.result).split(',')[1];
-                                if (b64) { cache[job.url] = b64; setIconCache(cache); }
-                            };
-                            fr.readAsDataURL(blob);
-                        })
-                        .catch(function() {});
-                }
-                next(); // 无论成败都继续队列
-            };
-            img.onload = function() { finish(true); };
-            img.onerror = function() { finish(false); };
-            // 超时保护：8s 内未加载完成视为失败，避免弱网下无限等待
-            setTimeout(function() { finish(false); }, 8000);
-            img.src = 'https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(job.url);
-            avatar.appendChild(img);
+            // 单请求方案：只用 fetch 抓一次（成功→显示+缓存；失败→文字回退），
+            // 避免 img 加载 + fetch 缓存各发一次 faviconsnap 请求（此前双倍请求）
+            fetch('https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(job.url))
+                .then(function(r) { return r.ok ? r.blob() : Promise.reject(); })
+                .then(function(blob) {
+                    var url2 = URL.createObjectURL(blob);
+                    var img = document.createElement('img');
+                    img.alt = '';
+                    img.decoding = 'async';
+                    img.onload = function() {
+                        img.style.display = 'block';
+                        if (fallbackSpan) fallbackSpan.style.display = 'none';
+                        URL.revokeObjectURL(url2);
+                    };
+                    img.onerror = function() { URL.revokeObjectURL(url2); };
+                    img.src = url2;
+                    avatar.appendChild(img);
+                    // 存缓存（<512KB）：跨域图标 canvas 会被污染，用 blob→FileReader 转 base64
+                    if (blob.size > 0 && blob.size <= 512 * 1024) {
+                        var fr = new FileReader();
+                        fr.onload = function() {
+                            var b64 = String(fr.result).split(',')[1];
+                            if (b64) { cache[job.url] = b64; setIconCache(cache); }
+                        };
+                        fr.readAsDataURL(blob);
+                    }
+                    next();
+                })
+                .catch(function() { next(); }); // 失败：保持文字回退，继续队列
         }
 
         // 启动首批并发
