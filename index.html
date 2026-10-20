@@ -705,9 +705,13 @@ body .texture {
             var fallbackSpan = avatar.querySelector('.fallback-text');
             // 单请求方案：只用 fetch 抓一次（成功→显示+缓存；失败→文字回退），
             // 避免 img 加载 + fetch 缓存各发一次 faviconsnap 请求（此前双倍请求）
-            fetch('https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(job.url))
+            // 必须带超时：faviconsnap 弱网下可能长时间挂起，无超时会卡死队列导致后续图标永不加载
+            var ctrl = new AbortController();
+            var tid = setTimeout(function() { ctrl.abort(); }, 6000);
+            fetch('https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(job.url), { signal: ctrl.signal })
                 .then(function(r) { return r.ok ? r.blob() : Promise.reject(); })
                 .then(function(blob) {
+                    clearTimeout(tid);
                     var url2 = URL.createObjectURL(blob);
                     var img = document.createElement('img');
                     img.alt = '';
@@ -731,7 +735,7 @@ body .texture {
                     }
                     next();
                 })
-                .catch(function() { next(); }); // 失败：保持文字回退，继续队列
+                .catch(function() { clearTimeout(tid); next(); }); // 失败/超时：保持文字回退，继续队列
         }
 
         // 启动首批并发
