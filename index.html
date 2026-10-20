@@ -664,17 +664,46 @@ body .texture {
 
     // 图标限量并发加载（一次 2 个）：9 个图标同时请求会打满弱网连接池互相拖死（实测单图标可拖到 10s），
     // 改为小并发按序加载，每个图标失败立即显示文字回退，不阻塞其余图标
+    var ICON_CACHE_KEY = 'nav_icon_cache_v1';
+    function getIconCache() {
+        try {
+            var raw = localStorage.getItem(ICON_CACHE_KEY);
+            return raw ? JSON.parse(raw) : {};
+        } catch (e) { return {}; }
+    }
+    function setIconCache(cache) {
+        try { localStorage.setItem(ICON_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
+    }
+
     function loadIconsSequentially(jobs) {
         var avatars = document.querySelectorAll('.link-avatar');
+        var cache = getIconCache();
         var index = 0;
         var CONCURRENCY = 2;
+
+        // 先应用本地缓存（秒显），未缓存的下方异步加载
+        for (var ci = 0; ci < jobs.length; ci++) {
+            var job = jobs[ci];
+            var cachedB64 = cache[job.url];
+            if (cachedB64 && avatars[ci]) {
+                var cImg = document.createElement('img');
+                cImg.alt = '';
+                cImg.src = 'data:image/png;base64,' + cachedB64;
+                var cFb = avatars[ci].querySelector('.fallback-text');
+                cImg.onload = function() {
+                    this.style.display = 'block';
+                    if (cFb) cFb.style.display = 'none';
+                };
+                avatars[ci].appendChild(cImg);
+            }
+        }
 
         function next() {
             if (index >= jobs.length) return;
             var jobIdx = index++;
             var job = jobs[jobIdx];
             var avatar = avatars[jobIdx];
-            if (!avatar) return;
+            if (!avatar || cache[job.url]) return next(); // 已缓存跳过
             var img = document.createElement('img');
             img.alt = '';
             img.decoding = 'async';
@@ -683,11 +712,21 @@ body .texture {
             var finish = function(ok) {
                 if (done) return;
                 done = true;
-                if (ok) {
-                    if (img.naturalWidth > 0) {
-                        img.style.display = 'block';
-                        fallbackSpan.style.display = 'none';
-                    }
+                if (ok && img.naturalWidth > 0) {
+                    img.style.display = 'block';
+                    if (fallbackSpan) fallbackSpan.style.display = 'none';
+                    // 存缓存：转 base64（图标小，通常 <20KB）
+                    try {
+                        var canvas = document.createElement('canvas');
+                        canvas.width = img.naturalWidth;
+                        canvas.height = img.naturalHeight;
+                        var ctx = canvas.getContext('2d');
+                        if (ctx && img.naturalWidth <= 256) {
+                            ctx.drawImage(img, 0, 0);
+                            cache[job.url] = canvas.toDataURL('image/png').split(',')[1];
+                            setIconCache(cache);
+                        }
+                    } catch (e) { /* 缓存失败不阻塞 */ }
                 }
                 next(); // 无论成败都继续队列
             };
