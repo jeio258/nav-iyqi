@@ -32,4 +32,4 @@ Thumbs.db
 # 密钥文件
 *.pem
 *.key
-*.crt
+*.crt.dev.vars
