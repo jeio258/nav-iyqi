@@ -715,18 +715,19 @@ body .texture {
                 if (ok && img.naturalWidth > 0) {
                     img.style.display = 'block';
                     if (fallbackSpan) fallbackSpan.style.display = 'none';
-                    // 存缓存：转 base64（图标小，通常 <20KB）
-                    try {
-                        var canvas = document.createElement('canvas');
-                        canvas.width = img.naturalWidth;
-                        canvas.height = img.naturalHeight;
-                        var ctx = canvas.getContext('2d');
-                        if (ctx && img.naturalWidth <= 256) {
-                            ctx.drawImage(img, 0, 0);
-                            cache[job.url] = canvas.toDataURL('image/png').split(',')[1];
-                            setIconCache(cache);
-                        }
-                    } catch (e) { /* 缓存失败不阻塞 */ }
+                    // 存缓存：跨域图标用 fetch 抓二进制转 base64（canvas.toDataURL 会被跨域污染抛错，不能用）
+                    fetch('https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(job.url))
+                        .then(function(r) { return r.blob(); })
+                        .then(function(blob) {
+                            if (blob.size > 512 * 1024) return; // 超大不缓存
+                            var fr = new FileReader();
+                            fr.onload = function() {
+                                var b64 = String(fr.result).split(',')[1];
+                                if (b64) { cache[job.url] = b64; setIconCache(cache); }
+                            };
+                            fr.readAsDataURL(blob);
+                        })
+                        .catch(function() {});
                 }
                 next(); // 无论成败都继续队列
             };
