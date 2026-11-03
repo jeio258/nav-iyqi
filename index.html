@@ -117,7 +117,7 @@ body::before {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    background-attachment: fixed;
+    /* 勿加 background-attachment: fixed：iOS Safari 下与 position:fixed 同用会背景丢失/滚动卡顿 */
     opacity: 1;
 }
 
@@ -525,22 +525,27 @@ body .texture {
             </div>
         </div>
         <div class="footer-right">
-            <a href="/admin" class="admin-link">管理</a>
+            <a href="/admin.html" class="admin-link">管理</a>
         </div>
     </footer>
 
 <script>
-(function() {
-    // ========== XSS 防护（核心安全函数） ==========
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
+(function () {
+    'use strict';
 
     // ========== 配置 ==========
-    const CONFIG = {
+    var CONFIG = {
         startDate: '2025-12-01 00:00:00',
-        settingsStorageKey: 'nav_settings',
+        settingsKey: 'nav_settings',
+        linksCacheKey: 'nav_links_cache',
+        linksCacheTtl: 5 * 60 * 1000,
+        iconCacheKey: 'nav_icon_cache_v1',
+        iconConcurrency: 2,
+        iconTimeout: 6000,
+        themeKey: 'theme',
+        apiLinks: '/api/links',
+        apiSettings: '/api/settings',
+        iconApi: 'https://faviconsnap.com/api/favicon?url=',
         bgImages: [
             'https://t.alcy.cc/moez',
             'https://t.alcy.cc/moez?2',
@@ -553,7 +558,6 @@ body .texture {
         hitokotoApi: 'https://v1.hitokoto.cn/?c=f&encode=json',
         hitokotoInterval: 10000,
         hitokotoTimeout: 5000,
-        apiBase: '/api/links',
         fallbackHitokotos: [
             '🌱 学而时习之，不亦说乎。',
             '🌱 静以修身，俭以养德。',
@@ -562,357 +566,352 @@ body .texture {
             '🌱 路漫漫其修远兮，吾将上下而求索。'
         ],
         defaultLinks: [
-            { name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临' },
-            { name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图' },
-            { name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁' },
-            { name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮' },
-            { name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦' },
-            { name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️' }
+            { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active' },
+            { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active' },
+            { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active' },
+            { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active' },
+            { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active' },
+            { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active' }
         ]
     };
 
-    const body = document.body;
-    const linksContainer = document.getElementById('linksContainer');
-    const linkCount = document.getElementById('linkCount');
-    const runtimeSpan = document.querySelector('#runtime span');
-    const hitokotoText = document.getElementById('hitokoto-text');
-    const hitokotoFrom = document.getElementById('hitokoto-from');
-    const themeToggleBtn = document.getElementById('themeToggleBtn');
-    const themeIcon = document.getElementById('themeIcon');
-    const themeLabel = document.getElementById('themeLabel');
+    // ========== DOM 引用 ==========
+    var el = {
+        links: document.getElementById('linksContainer'),
+        count: document.getElementById('linkCount'),
+        runtime: document.querySelector('#runtime span'),
+        hitokotoText: document.getElementById('hitokoto-text'),
+        hitokotoFrom: document.getElementById('hitokoto-from'),
+        themeBtn: document.getElementById('themeToggleBtn'),
+        themeIcon: document.getElementById('themeIcon'),
+        themeLabel: document.getElementById('themeLabel'),
+        title: document.querySelector('.page-header h1'),
+        subtitle: document.querySelector('.subtitle-text'),
+        themeMeta: document.querySelector('meta[name="theme-color"]')
+    };
 
-    // ========== 加载链接（本地缓存 + 后台刷新，实现回访秒开） ==========
-    const CACHE_KEY = 'nav_links_cache';
-    const CACHE_TTL = 5 * 60 * 1000; // 5 分钟
-
-    function getCachedLinks() {
+    // ========== 存储工具（统一异常兜底） ==========
+    function readJSON(key, fallback) {
         try {
-            var raw = localStorage.getItem(CACHE_KEY);
-            if (!raw) return null;
-            var data = JSON.parse(raw);
-            if (!data || !Array.isArray(data.links)) return null;
-            if (Date.now() - data.ts > CACHE_TTL) return null;
-            return data.links;
-        } catch (e) { return null; }
+            var raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : fallback;
+        } catch (e) { return fallback; }
     }
 
-    function setCachedLinks(links) {
-        try { localStorage.setItem(CACHE_KEY, JSON.stringify({ links: links, ts: Date.now() })); } catch (e) {}
+    function writeJSON(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* 配额满/隐私模式忽略 */ }
     }
 
-    async function loadLinks() {
-        var renderedFromCache = false;
-
-        // 1. 优先渲染本地缓存（若有），实现秒开
-        var cached = getCachedLinks();
-        if (cached && cached.length > 0) {
-            var activeCached = cached.filter(function(l) { return l.status === 'active'; });
-            if (activeCached.length > 0) {
-                renderLinks(activeCached);
-                renderedFromCache = true;
-            }
-        }
-
-        // 2. 后台拉取最新数据并刷新缓存
-        try {
-            var response = await fetch(CONFIG.apiBase);
-            if (!response.ok) throw new Error('API 响应错误');
-            var data = await response.json();
-            if (data.links && data.links.length > 0) {
-                setCachedLinks(data.links);
-                var active = data.links.filter(function(l) { return l.status === 'active'; });
-                renderLinks(active);
-                return;
-            }
-        } catch (e) {
-            console.warn('无法从 API 加载链接:', e.message);
-        }
-
-        // 3. 仅当没有缓存可用时才回退默认链接
-        if (!renderedFromCache) renderLinks(CONFIG.defaultLinks);
-    }
-
+    // ========== 链接渲染 ==========
     function renderLinks(links) {
-        if (!links || links.length === 0) {
-            linksContainer.innerHTML = '<div style="text-align:center;padding:2.5rem;color:var(--color-muted);animation:headerIn .6s ease both"><p style="font-size:2rem;margin-bottom:.5rem">📭</p><p>暂无链接</p></div>';
-            if (linkCount) linkCount.textContent = '0 个友邻';
+        var list = (links || []).filter(function (l) { return l && l.status !== 'inactive'; });
+        el.links.textContent = '';
+
+        if (list.length === 0) {
+            var empty = document.createElement('div');
+            empty.style.cssText = 'text-align:center;padding:2.5rem;color:var(--color-muted)';
+            var emoji = document.createElement('p');
+            emoji.style.cssText = 'font-size:2rem;margin-bottom:.5rem';
+            emoji.textContent = '📭';
+            var tip = document.createElement('p');
+            tip.textContent = '暂无链接';
+            empty.appendChild(emoji);
+            empty.appendChild(tip);
+            el.links.appendChild(empty);
+            if (el.count) el.count.textContent = '0 个友邻';
             return;
         }
-        if (linkCount) linkCount.textContent = links.length + ' 个友邻';
 
-        // 使用 textContent 方式避免 XSS：构建 DOM 而非 innerHTML 拼接
-        var html = '';
-        var iconJobs = [];
-        for (var i = 0; i < links.length; i++) {
-            var link = links[i];
-            var name = escapeHtml(link.name);
-            var url = escapeHtml(link.url);
-            var fallback = escapeHtml(link.fallback || link.name.charAt(0));
-            html += '<a href="' + url + '" class="pill-link" target="_blank" rel="noopener noreferrer" role="listitem" title="' + name + '" style="animation-delay:' + (0.06 * i).toFixed(2) + 's">' +
-                '<span class="link-avatar">' +
-                    '<span class="fallback-text" style="display:flex;">' + fallback + '</span>' +
-                '</span>' +
-                '<span>' + name + '</span>' +
-            '</a>';
-            iconJobs.push({ url: url, fallbackText: fallback });
-        }
-        linksContainer.innerHTML = html;
-        loadIconsSequentially(iconJobs);
+        if (el.count) el.count.textContent = list.length + ' 个友邻';
+
+        var fragment = document.createDocumentFragment();
+        var jobs = [];
+
+        list.forEach(function (link, i) {
+            var name = String(link.name || '');
+            var url = String(link.url || '');
+
+            var a = document.createElement('a');
+            a.className = 'pill-link';
+            a.href = url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.setAttribute('role', 'listitem');
+            a.title = name;
+            a.style.animationDelay = (0.06 * i).toFixed(2) + 's';
+
+            var avatar = document.createElement('span');
+            avatar.className = 'link-avatar';
+
+            // 图标未就绪时先显示文字，避免空白
+            var fallback = document.createElement('span');
+            fallback.className = 'fallback-text';
+            fallback.textContent = String(link.fallback || name.charAt(0) || '🔗');
+
+            avatar.appendChild(fallback);
+
+            var label = document.createElement('span');
+            label.textContent = name;
+
+            a.appendChild(avatar);
+            a.appendChild(label);
+            fragment.appendChild(a);
+
+            jobs.push({ url: url, avatar: avatar, fallback: fallback });
+        });
+
+        el.links.appendChild(fragment);
+        loadIcons(jobs);
     }
 
-    // 图标限量并发加载（一次 2 个）：9 个图标同时请求会打满弱网连接池互相拖死（实测单图标可拖到 10s），
-    // 改为小并发按序加载，每个图标失败立即显示文字回退，不阻塞其余图标
-    var ICON_CACHE_KEY = 'nav_icon_cache_v1';
-    function getIconCache() {
-        try {
-            var raw = localStorage.getItem(ICON_CACHE_KEY);
-            return raw ? JSON.parse(raw) : {};
-        } catch (e) { return {}; }
-    }
-    function setIconCache(cache) {
-        try { localStorage.setItem(ICON_CACHE_KEY, JSON.stringify(cache)); } catch (e) {}
-    }
+    // ========== 图标（小并发 + 超时 + localStorage 缓存） ==========
+    function loadIcons(jobs) {
+        var cache = readJSON(CONFIG.iconCacheKey, {});
+        var cursor = 0;
 
-    function loadIconsSequentially(jobs) {
-        var avatars = document.querySelectorAll('.link-avatar');
-        var cache = getIconCache();
-        var index = 0;
-        var CONCURRENCY = 2;
+        // 已缓存的立即显示（二次访问秒开）
+        jobs.forEach(function (job) {
+            var b64 = cache[job.url];
+            if (!b64) return;
+            var img = document.createElement('img');
+            img.alt = '';
+            img.onload = function () {
+                img.style.display = 'block';
+                job.fallback.style.display = 'none';
+            };
+            img.src = 'data:image/png;base64,' + b64;
+            job.avatar.appendChild(img);
+        });
 
-        // 先应用本地缓存（秒显），未缓存的下方异步加载
-        for (var ci = 0; ci < jobs.length; ci++) {
-            var job = jobs[ci];
-            var cachedB64 = cache[job.url];
-            if (cachedB64 && avatars[ci]) {
-                var cImg = document.createElement('img');
-                cImg.alt = '';
-                cImg.src = 'data:image/png;base64,' + cachedB64;
-                var cFb = avatars[ci].querySelector('.fallback-text');
-                cImg.onload = function() {
-                    this.style.display = 'block';
-                    if (cFb) cFb.style.display = 'none';
-                };
-                avatars[ci].appendChild(cImg);
-            }
-        }
-
+        // 未缓存的按小并发逐个抓取；任何情况都必须推进游标，否则后续图标永不加载
         function next() {
-            if (index >= jobs.length) return;
-            var jobIdx = index++;
-            var job = jobs[jobIdx];
-            var avatar = avatars[jobIdx];
-            if (!avatar || cache[job.url]) return next(); // 已缓存跳过
-            var fallbackSpan = avatar.querySelector('.fallback-text');
-            // 单请求方案：只用 fetch 抓一次（成功→显示+缓存；失败→文字回退），
-            // 避免 img 加载 + fetch 缓存各发一次 faviconsnap 请求（此前双倍请求）
-            // 必须带超时：faviconsnap 弱网下可能长时间挂起，无超时会卡死队列导致后续图标永不加载
+            while (cursor < jobs.length && cache[jobs[cursor].url]) cursor++;
+            if (cursor >= jobs.length) return;
+            var job = jobs[cursor++];
             var ctrl = new AbortController();
-            var tid = setTimeout(function() { ctrl.abort(); }, 6000);
-            fetch('https://faviconsnap.com/api/favicon?url=' + encodeURIComponent(job.url), { signal: ctrl.signal })
-                .then(function(r) { return r.ok ? r.blob() : Promise.reject(); })
-                .then(function(blob) {
-                    clearTimeout(tid);
-                    var url2 = URL.createObjectURL(blob);
+            var timer = setTimeout(function () { ctrl.abort(); }, CONFIG.iconTimeout);
+
+            fetch(CONFIG.iconApi + encodeURIComponent(job.url), { signal: ctrl.signal })
+                .then(function (r) { return r.ok ? r.blob() : Promise.reject(new Error('bad status')); })
+                .then(function (blob) {
+                    clearTimeout(timer);
+                    if (!blob.size) throw new Error('empty');
+                    var objectUrl = URL.createObjectURL(blob);
                     var img = document.createElement('img');
                     img.alt = '';
                     img.decoding = 'async';
-                    img.onload = function() {
+                    img.onload = function () {
                         img.style.display = 'block';
-                        if (fallbackSpan) fallbackSpan.style.display = 'none';
-                        URL.revokeObjectURL(url2);
+                        job.fallback.style.display = 'none';
+                        URL.revokeObjectURL(objectUrl);
                     };
-                    img.onerror = function() { URL.revokeObjectURL(url2); };
-                    img.src = url2;
-                    avatar.appendChild(img);
-                    // 存缓存（<512KB）：跨域图标 canvas 会被污染，用 blob→FileReader 转 base64
-                    if (blob.size > 0 && blob.size <= 512 * 1024) {
-                        var fr = new FileReader();
-                        fr.onload = function() {
-                            var b64 = String(fr.result).split(',')[1];
-                            if (b64) { cache[job.url] = b64; setIconCache(cache); }
+                    img.onerror = function () { URL.revokeObjectURL(objectUrl); };
+                    img.src = objectUrl;
+                    job.avatar.appendChild(img);
+
+                    // 跨域图标 canvas 会被污染，改用 blob→FileReader 转 base64 持久化
+                    if (blob.size <= 512 * 1024) {
+                        var reader = new FileReader();
+                        reader.onload = function () {
+                            var b64 = String(reader.result).split(',')[1];
+                            if (b64) { cache[job.url] = b64; writeJSON(CONFIG.iconCacheKey, cache); }
                         };
-                        fr.readAsDataURL(blob);
+                        reader.readAsDataURL(blob);
                     }
-                    next();
                 })
-                .catch(function() { clearTimeout(tid); next(); }); // 失败/超时：保持文字回退，继续队列
+                .catch(function () { /* 失败保持文字回退 */ })
+                .then(next);
         }
 
-        // 启动首批并发
-        for (var k = 0; k < CONCURRENCY; k++) next();
+        for (var i = 0; i < CONFIG.iconConcurrency; i++) next();
     }
 
-    // ========== 背景淡入淡出轮转（延迟启动，不阻塞首屏） ==========
-    var bgLayer = null;
+    // ========== 链接数据加载（缓存优先 + 网络刷新 + 弱网兜底） ==========
+    function loadLinks() {
+        var cache = readJSON(CONFIG.linksCacheKey, null);
+        var rendered = false;
+
+        if (cache && Array.isArray(cache.links) && Date.now() - cache.ts < CONFIG.linksCacheTtl) {
+            renderLinks(cache.links);
+            rendered = true;
+        }
+
+        // 弱网兜底：必须在 fetch 前注册。API 挂起且无缓存时 5s 后用默认链接顶上，
+        // 避免骨架屏无限转（用户感知为白屏不加载）
+        setTimeout(function () {
+            if (!rendered) renderLinks(CONFIG.defaultLinks);
+        }, 5000);
+
+        fetch(CONFIG.apiLinks)
+            .then(function (r) { if (!r.ok) throw new Error('API ' + r.status); return r.json(); })
+            .then(function (data) {
+                if (!data.links || !data.links.length) return;
+                writeJSON(CONFIG.linksCacheKey, { links: data.links, ts: Date.now() });
+                renderLinks(data.links);
+            })
+            .catch(function (e) {
+                console.warn('链接加载失败:', e.message);
+                if (!rendered) renderLinks(CONFIG.defaultLinks);
+            });
+    }
+
+    // ========== 背景轮转（load 后启动，不阻塞 Load 事件） ==========
     var bgIndex = 0;
     var bgTimer = null;
 
+    function rotateBackground() {
+        var image = CONFIG.bgImages[bgIndex % CONFIG.bgImages.length];
+        bgIndex++;
+        // 复用单一背景层，交叉淡入（勿用 background-attachment:fixed：iOS Safari 下背景丢失/滚动卡顿）
+        // 先取旧层再插入新层，避免把新层自己算进 stale
+        var stale = document.querySelectorAll('.bg-layer');
+        var layer = document.createElement('div');
+        layer.className = 'bg-layer';
+        layer.style.cssText = 'position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center;' +
+            'transition:opacity ' + (CONFIG.bgFadeDuration / 1000).toFixed(1) + 's ease-in-out;opacity:0;pointer-events:none;' +
+            'background-image:url("' + image + '")';
+        document.body.insertBefore(layer, document.body.firstChild);
+        requestAnimationFrame(function () { layer.style.opacity = '1'; });
+        stale.forEach(function (node) { node.style.opacity = '0'; });
+        setTimeout(function () {
+            stale.forEach(function (node) { node.remove(); });
+        }, CONFIG.bgFadeDuration + 100);
+    }
+
     function initBackground() {
-        bgLayer = document.createElement('div');
-        bgLayer.style.cssText = 'position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center;background-attachment:fixed;transition:opacity ' + (CONFIG.bgFadeDuration / 1000).toFixed(1) + 's ease-in-out;opacity:0;pointer-events:none;';
-        document.body.insertBefore(bgLayer, document.body.firstChild);
         rotateBackground();
         bgTimer = setInterval(rotateBackground, CONFIG.bgRotateInterval);
     }
 
-    function rotateBackground() {
-        if (!CONFIG.bgImages.length || !bgLayer) return;
-        var next = CONFIG.bgImages[bgIndex];
-        if (bgLayer.style.opacity === '0' || !bgLayer.style.backgroundImage) {
-            bgLayer.style.backgroundImage = 'url(\'' + next + '\')';
-            bgLayer.style.opacity = '1';
-        } else {
-            var curr = bgLayer.cloneNode();
-            curr.style.backgroundImage = 'url(\'' + next + '\')';
-            curr.style.opacity = '0';
-            document.body.insertBefore(curr, document.body.firstChild);
-            requestAnimationFrame(function() { curr.style.opacity = '1'; });
-            setTimeout(function() { if (curr.parentNode) curr.remove(); }, CONFIG.bgFadeDuration + 100);
-        }
-        bgIndex = (bgIndex + 1) % CONFIG.bgImages.length;
-    }
-
-    // 延迟启动背景轮转：load 事件后再加载，避免 t.alcy.cc 背景图（实测 6.5s）阻塞 Load 事件
-    if (document.readyState === 'complete') {
-        setTimeout(initBackground, 0);
-    } else {
-        window.addEventListener('load', function() { setTimeout(initBackground, 0); });
-    }
-
     // ========== 运行时间 ==========
+    var startDate = new Date(String(getStartDate()).replace(' ', 'T'));
+
     function getStartDate() {
-        try {
-            var s = localStorage.getItem(CONFIG.settingsStorageKey);
-            if (s) { var p = JSON.parse(s); if (p.startDate) return p.startDate; }
-        } catch(e) {}
-        return CONFIG.startDate;
+        var settings = readJSON(CONFIG.settingsKey, null);
+        return (settings && settings.startDate) || CONFIG.startDate;
     }
-    var startDate = new Date(getStartDate().replace(' ', 'T'));
 
     function updateRuntime() {
-        if (!runtimeSpan) return;
-        var now = new Date();
-        var diff = Math.floor((now - startDate) / 1000);
-        if (diff < 0) diff = 0;
+        if (!el.runtime) return;
+        var diff = Math.max(0, Math.floor((Date.now() - startDate.getTime()) / 1000));
         var days = Math.floor(diff / 86400);
         diff %= 86400;
-        var h = String(Math.floor(diff / 3600)).padStart(2, '0');
-        diff %= 3600;
-        var m = String(Math.floor(diff / 60)).padStart(2, '0');
-        var s = String(diff % 60).padStart(2, '0');
-        runtimeSpan.textContent = days + '天 ' + h + ':' + m + ':' + s;
+        var pad = function (n) { return String(n).padStart(2, '0'); };
+        el.runtime.textContent = days + '天 ' + pad(Math.floor(diff / 3600)) + ':' +
+            pad(Math.floor((diff % 3600) / 60)) + ':' + pad(diff % 60);
     }
-    // 对齐到下一秒边界执行，避免每 1000ms 空转
+
+    // 对齐到秒边界，避免 1000ms 定时器空转漂移
     function scheduleRuntime() {
         updateRuntime();
         setTimeout(scheduleRuntime, 1000 - new Date().getMilliseconds());
     }
-    scheduleRuntime();
 
-    // ========== 一言（延迟启动） ==========
-    var hitokotoTimer;
+    // ========== 一言 ==========
+    var hitokotoTimer = null;
+
+    function setHitokoto(text, from) {
+        if (!el.hitokotoText) return;
+        el.hitokotoText.style.opacity = '0';
+        setTimeout(function () {
+            el.hitokotoText.textContent = text;
+            if (el.hitokotoFrom) el.hitokotoFrom.textContent = from || '';
+            el.hitokotoText.style.opacity = '1';
+        }, 400);
+    }
 
     function fetchHitokoto() {
-        if (!hitokotoText) return;
         var ctrl = new AbortController();
-        var tid = setTimeout(function() { ctrl.abort(); }, CONFIG.hitokotoTimeout);
+        var timer = setTimeout(function () { ctrl.abort(); }, CONFIG.hitokotoTimeout);
         fetch(CONFIG.hitokotoApi, { signal: ctrl.signal })
-            .then(function(r) { clearTimeout(tid); if (!r.ok) throw new Error(''); return r.json(); })
-            .then(function(d) {
-                if (d && d.hitokoto) {
-                    hitokotoText.style.opacity = '0';
-                    setTimeout(function() {
-                        hitokotoText.textContent = '「' + d.hitokoto + '」';
-                        hitokotoFrom.textContent = d.from ? '—— ' + d.from : '';
-                        hitokotoText.style.opacity = '1';
-                    }, 400);
-                } else throw new Error('');
+            .then(function (r) {
+                clearTimeout(timer);
+                if (!r.ok) throw new Error('bad status');
+                return r.json();
             })
-            .catch(function() {
-                var fb = CONFIG.fallbackHitokotos;
-                hitokotoText.style.opacity = '0';
-                setTimeout(function() {
-                    hitokotoText.textContent = fb[Math.floor(Math.random() * fb.length)];
-                    hitokotoFrom.textContent = '';
-                    hitokotoText.style.opacity = '1';
-                }, 400);
+            .then(function (data) {
+                if (!data || !data.hitokoto) throw new Error('empty');
+                setHitokoto('「' + data.hitokoto + '」', data.from ? '—— ' + data.from : '');
+            })
+            .catch(function () {
+                var list = CONFIG.fallbackHitokotos;
+                setHitokoto(list[Math.floor(Math.random() * list.length)], '');
             });
     }
 
-    // 延迟启动一言（先渲染页面）
-    setTimeout(function() {
+    // ========== 主题 ==========
+    function applyTheme(theme) {
+        var dark = theme === 'dark';
+        if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+        else document.documentElement.removeAttribute('data-theme');
+        if (el.themeIcon) el.themeIcon.textContent = dark ? '☀️' : '🌙';
+        if (el.themeLabel) el.themeLabel.textContent = dark ? '浅色' : '深色';
+        if (el.themeMeta) el.themeMeta.setAttribute('content', dark ? '#1a1512' : '#f5ebe0');
+        try { localStorage.setItem(CONFIG.themeKey, theme); } catch (e) {}
+    }
+
+    function currentTheme() {
+        return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    }
+
+    // ========== 站点设置（本地缓存 + 云端覆盖，单一写入路径） ==========
+    function applySettings(settings) {
+        if (!settings) return;
+        if (settings.title && el.title) el.title.textContent = settings.title;
+        if (settings.subtitle && el.subtitle) el.subtitle.textContent = settings.subtitle;
+        if (settings.startDate) {
+            var parsed = new Date(String(settings.startDate).replace(' ', 'T'));
+            if (!isNaN(parsed.getTime())) {
+                startDate = parsed;
+                updateRuntime();
+            }
+        }
+    }
+
+    function loadSettings() {
+        applySettings(readJSON(CONFIG.settingsKey, null));
+
+        fetch(CONFIG.apiSettings)
+            .then(function (r) { if (!r.ok) throw new Error('API ' + r.status); return r.json(); })
+            .then(function (data) {
+                if (!data.settings) return;
+                // 无条件回写：回访时本地缓存即为最新云端值
+                writeJSON(CONFIG.settingsKey, data.settings);
+                applySettings(data.settings);
+            })
+            .catch(function () { /* 保留本地设置 */ });
+    }
+
+    // ========== 启动 ==========
+    loadLinks();
+    loadSettings();
+
+    applyTheme(localStorage.getItem(CONFIG.themeKey) ||
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+
+    if (el.themeBtn) {
+        el.themeBtn.addEventListener('click', function () {
+            applyTheme(currentTheme() === 'dark' ? 'light' : 'dark');
+        });
+    }
+
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+        if (!localStorage.getItem(CONFIG.themeKey)) applyTheme(e.matches ? 'dark' : 'light');
+    });
+
+    scheduleRuntime();
+
+    // 背景与一言延后启动：主内容优先，不抢占首屏带宽
+    var startBackground = function () { setTimeout(initBackground, 0); };
+    if (document.readyState === 'complete') startBackground();
+    else window.addEventListener('load', startBackground);
+
+    setTimeout(function () {
         fetchHitokoto();
         hitokotoTimer = setInterval(fetchHitokoto, CONFIG.hitokotoInterval);
     }, 1500);
 
-    // ========== 主题切换 ==========
-    var THEME_KEY = 'theme';
-    function applyTheme(theme) {
-        if (theme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark');
-            if (themeIcon) themeIcon.textContent = '☀️';
-            if (themeLabel) themeLabel.textContent = '浅色';
-            var meta = document.querySelector('meta[name="theme-color"]');
-            if (meta) meta.setAttribute('content', '#1a1512');
-        } else {
-            document.documentElement.removeAttribute('data-theme');
-            if (themeIcon) themeIcon.textContent = '🌙';
-            if (themeLabel) themeLabel.textContent = '深色';
-            var meta2 = document.querySelector('meta[name="theme-color"]');
-            if (meta2) meta2.setAttribute('content', '#f5ebe0');
-        }
-        localStorage.setItem(THEME_KEY, theme);
-    }
-
-    var savedTheme = localStorage.getItem(THEME_KEY);
-    applyTheme(savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-
-    if (themeToggleBtn) {
-        themeToggleBtn.addEventListener('click', function() {
-            applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-        });
-    }
-
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
-        if (!localStorage.getItem(THEME_KEY)) applyTheme(e.matches ? 'dark' : 'light');
-    });
-
-    // ========== 初始化（关键路径优先） ==========
-    loadLinks();
-    applyLocalSettings();
-    loadServerSettings();
-
-    // 应用本地缓存的站点设置
-    function applyLocalSettings() {
-        try {
-            var s = localStorage.getItem(CONFIG.settingsStorageKey);
-            if (s) {
-                var p = JSON.parse(s);
-                if (p.title) document.querySelector('.page-header h1').textContent = p.title;
-                if (p.subtitle) document.querySelector('.subtitle-text').textContent = p.subtitle;
-            }
-        } catch(e) {}
-    }
-
-    // 从服务器加载站点设置（云端优先，成功后更新本地缓存）
-    function loadServerSettings() {
-        fetch('/api/settings')
-            .then(function(r) { if (!r.ok) throw new Error(''); return r.json(); })
-            .then(function(data) {
-                if (!data.settings) throw new Error('');
-                var p = data.settings;
-                if (p.title) document.querySelector('.page-header h1').textContent = p.title;
-                if (p.subtitle) document.querySelector('.subtitle-text').textContent = p.subtitle;
-                if (p.startDate) {
-                    try { localStorage.setItem(CONFIG.settingsStorageKey, JSON.stringify(p)); } catch(e) {}
-                    startDate = new Date(String(p.startDate).replace(' ', 'T'));
-                    updateRuntime();
-                }
-            })
-            .catch(function() { /* 服务器不可用时保留本地设置 */ });
-    }
-
-    window.addEventListener('beforeunload', function() {
+    window.addEventListener('beforeunload', function () {
         if (hitokotoTimer) clearInterval(hitokotoTimer);
         if (bgTimer) clearInterval(bgTimer);
     });
