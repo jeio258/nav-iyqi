@@ -10,7 +10,13 @@ const CORS = {
 const json = (data, status = 200, extraHeaders) =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json; charset=UTF-8', ...CORS, ...extraHeaders }
+    headers: {
+      'Content-Type': 'application/json; charset=UTF-8',
+      // 动态数据禁止浏览器缓存：否则后台改数据后仍读到旧响应，表现为需要刷新两遍
+      'Cache-Control': 'no-store',
+      ...CORS,
+      ...extraHeaders
+    }
   });
 
 // 认证类错误携带状态码，避免调用方靠错误文案猜类型

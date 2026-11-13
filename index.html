@@ -538,7 +538,8 @@ body .texture {
         startDate: '2025-12-01 00:00:00',
         settingsKey: 'nav_settings',
         linksCacheKey: 'nav_links_cache',
-        linksCacheTtl: 5 * 60 * 1000,
+        linksCacheTtl: 60 * 1000,
+        linksUpdatedKey: 'nav_links_updated_at',
         iconCacheKey: 'nav_icon_cache_v1',
         iconConcurrency: 2,
         iconTimeout: 6000,
@@ -726,31 +727,38 @@ body .texture {
         for (var i = 0; i < CONFIG.iconConcurrency; i++) next();
     }
 
-    // ========== 链接数据加载（缓存优先 + 网络刷新 + 弱网兜底） ==========
+    // ========== 链接数据加载（缓存优先 + 网络刷新，后台改动能立即失效缓存） ==========
     function loadLinks() {
         var cache = readJSON(CONFIG.linksCacheKey, null);
+        // 后台保存后写入时间戳，使首页旧缓存立即失效（同源 localStorage 共享）
+        var updatedAt = Number(localStorage.getItem(CONFIG.linksUpdatedKey) || 0);
         var rendered = false;
 
-        if (cache && Array.isArray(cache.links) && Date.now() - cache.ts < CONFIG.linksCacheTtl) {
+        var cacheUsable = cache && Array.isArray(cache.links) && cache.ts
+            && (Date.now() - cache.ts < CONFIG.linksCacheTtl)
+            && (cache.ts >= updatedAt);
+
+        if (cacheUsable) {
             renderLinks(cache.links);
             rendered = true;
         }
 
-        // 弱网兜底：必须在 fetch 前注册。API 挂起且无缓存时 5s 后用默认链接顶上，
-        // 避免骨架屏无限转（用户感知为白屏不加载）
-        setTimeout(function () {
-            if (!rendered) renderLinks(CONFIG.defaultLinks);
-        }, 5000);
+        var ctrl = new AbortController();
+        var timer = setTimeout(function () { ctrl.abort(); }, 10000);
 
-        fetch(CONFIG.apiLinks)
+        fetch(CONFIG.apiLinks, { signal: ctrl.signal, cache: 'no-store' })
             .then(function (r) { if (!r.ok) throw new Error('API ' + r.status); return r.json(); })
             .then(function (data) {
-                if (!data.links || !data.links.length) return;
+                clearTimeout(timer);
+                if (!data || !Array.isArray(data.links)) throw new Error('bad payload');
                 writeJSON(CONFIG.linksCacheKey, { links: data.links, ts: Date.now() });
                 renderLinks(data.links);
             })
             .catch(function (e) {
+                clearTimeout(timer);
                 console.warn('链接加载失败:', e.message);
+                // 仅在完全无可用数据时才用默认链接兑底；有缓存则保留缓存，
+                // 勿用假数据覆盖真实结果（否则用户看到“默认地址”误以为数据丢失）
                 if (!rendered) renderLinks(CONFIG.defaultLinks);
             });
     }

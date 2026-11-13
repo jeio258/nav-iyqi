@@ -3,6 +3,7 @@ var API = '/api';
 var KEYS = {
     token: 'admin_token',
     links: 'nav_links',
+    linksUpdatedAt: 'nav_links_updated_at',
     settings: 'nav_settings',
     theme: 'theme'
 };
@@ -63,7 +64,12 @@ function getLinks() {
     return Array.isArray(links) ? links : DEFAULT_LINKS.slice();
 }
 
-function saveLinksLocal(links) { writeJSON(KEYS.links, links); }
+function saveLinksLocal(links) {
+    writeJSON(KEYS.links, links);
+    // 写入更新戳（同源 localStorage 共享），首页据此使旧缓存立即失效，
+    // 否则后台新增链接后首页仍先用缓存渲染旧数据，表现为需要刷新两遍
+    try { localStorage.setItem(KEYS.linksUpdatedAt, String(Date.now())); } catch (e) {}
+}
 
 function getSettings() {
     return Object.assign({}, DEFAULT_SETTINGS, readJSON(KEYS.settings, null) || {});
