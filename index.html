@@ -538,7 +538,8 @@ body .texture {
         startDate: '2025-12-01 00:00:00',
         settingsKey: 'nav_settings',
         linksCacheKey: 'nav_links_cache',
-        linksCacheTtl: 60 * 1000,
+        linksCacheMaxAge: 60 * 1000,
+        apiTimeout: 8000,
         linksUpdatedKey: 'nav_links_updated_at',
         iconCacheKey: 'nav_icon_cache_v1',
         iconConcurrency: 2,
@@ -565,14 +566,6 @@ body .texture {
             '🌱 千里之行，始于足下。',
             '🌱 博观而约取，厚积而薄发。',
             '🌱 路漫漫其修远兮，吾将上下而求索。'
-        ],
-        defaultLinks: [
-            { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active' },
-            { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active' },
-            { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active' },
-            { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active' },
-            { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active' },
-            { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active' }
         ]
     };
 
@@ -603,32 +596,82 @@ body .texture {
         try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* 配额满/隐私模式忽略 */ }
     }
 
-    // ========== 链接渲染 ==========
-    function renderLinks(links) {
-        var list = (links || []).filter(function (l) { return l && l.status !== 'inactive'; });
-        el.links.textContent = '';
+    // ========== 链接渲染（内容签名去重：相同内容不重建，消除闪烁） ==========
+    var renderedSignature = null;
 
-        if (list.length === 0) {
-            var empty = document.createElement('div');
-            empty.style.cssText = 'text-align:center;padding:2.5rem;color:var(--color-muted)';
-            var emoji = document.createElement('p');
-            emoji.style.cssText = 'font-size:2rem;margin-bottom:.5rem';
-            emoji.textContent = '📭';
-            var tip = document.createElement('p');
-            tip.textContent = '暂无链接';
-            empty.appendChild(emoji);
-            empty.appendChild(tip);
-            el.links.appendChild(empty);
-            if (el.count) el.count.textContent = '0 个友邻';
+    function linkSignature(links) {
+        return links.map(function (l) {
+            return [l.id, l.name, l.url, l.fallback, l.status].join('\u0001');
+        }).join('\u0002');
+    }
+
+    // 空态/错误态共用一套小卡片；错误态带重试，绝不留下纯白屏
+    function renderPlaceholder(kind) {
+        el.links.textContent = '';
+        renderedSignature = null;
+        if (el.count) el.count.textContent = '0 个友邻';
+
+        var box = document.createElement('div');
+        box.style.cssText = 'text-align:center;padding:2.5rem;color:var(--color-muted)';
+
+        if (kind === 'loading') {
+            var skel = document.createElement('div');
+            skel.className = 'loading-skeleton';
+            skel.style.cssText = 'width:100%;height:50px;border-radius:100px;margin:0 auto';
+            box.style.padding = '1.5rem';
+            box.appendChild(skel);
+            el.links.appendChild(box);
             return;
         }
 
-        if (el.count) el.count.textContent = list.length + ' 个友邻';
+        var face = document.createElement('p');
+        face.style.cssText = 'font-size:2rem;margin-bottom:.5rem';
+        face.textContent = kind === 'error' ? '⚠️' : '📭';
+
+        var text = document.createElement('p');
+        text.textContent = kind === 'error' ? '加载失败，请检查网络' : '暂无链接';
+
+        box.appendChild(face);
+        box.appendChild(text);
+
+        if (kind === 'error') {
+            var retry = document.createElement('button');
+            retry.textContent = '重试';
+            retry.style.cssText = 'margin-top:.9rem;padding:.45rem 1.3rem;border-radius:100px;' +
+                'border:1px solid var(--color-rule);background:var(--color-paper-2);color:var(--color-ink);' +
+                'font-family:inherit;font-size:.85rem;cursor:pointer';
+            retry.addEventListener('click', function () {
+                renderPlaceholder('loading');
+                loadLinks(true);
+            });
+            box.appendChild(retry);
+        }
+
+        el.links.appendChild(box);
+    }
+
+    function renderLinks(links, animate) {
+        var active = (links || []).filter(function (l) {
+            return l && l.url && l.status !== 'inactive';
+        });
+        var signature = linkSignature(active);
+        if (signature === renderedSignature) return false;   // 内容未变 → 不重建
+        renderedSignature = signature;
+
+        el.links.textContent = '';
+
+        if (active.length === 0) {
+            renderedSignature = null;
+            renderPlaceholder('empty');
+            return true;
+        }
+
+        if (el.count) el.count.textContent = active.length + ' 个友邻';
 
         var fragment = document.createDocumentFragment();
         var jobs = [];
 
-        list.forEach(function (link, i) {
+        active.forEach(function (link, i) {
             var name = String(link.name || '');
             var url = String(link.url || '');
 
@@ -639,7 +682,9 @@ body .texture {
             a.rel = 'noopener noreferrer';
             a.setAttribute('role', 'listitem');
             a.title = name;
-            a.style.animationDelay = (0.06 * i).toFixed(2) + 's';
+            // 仅首屏入场用逐个延迟动画；静默更新不加延迟，避免二次闪动
+            if (animate) a.style.animationDelay = (0.06 * i).toFixed(2) + 's';
+            else a.style.animation = 'none';
 
             var avatar = document.createElement('span');
             avatar.className = 'link-avatar';
@@ -663,14 +708,18 @@ body .texture {
 
         el.links.appendChild(fragment);
         loadIcons(jobs);
+        return true;
     }
 
     // ========== 图标（小并发 + 超时 + localStorage 缓存） ==========
+    var iconQueueToken = 0;
+
     function loadIcons(jobs) {
         var cache = readJSON(CONFIG.iconCacheKey, {});
         var cursor = 0;
+        // 每次渲染递增 token，旧队列（已被重建替换的 DOM）自动失效
+        var token = ++iconQueueToken;
 
-        // 已缓存的立即显示（二次访问秒开）
         jobs.forEach(function (job) {
             var b64 = cache[job.url];
             if (!b64) return;
@@ -684,8 +733,11 @@ body .texture {
             job.avatar.appendChild(img);
         });
 
+        function alive() { return token === iconQueueToken; }
+
         // 未缓存的按小并发逐个抓取；任何情况都必须推进游标，否则后续图标永不加载
         function next() {
+            if (!alive()) return;
             while (cursor < jobs.length && cache[jobs[cursor].url]) cursor++;
             if (cursor >= jobs.length) return;
             var job = jobs[cursor++];
@@ -724,27 +776,27 @@ body .texture {
                 .then(next);
         }
 
+
         for (var i = 0; i < CONFIG.iconConcurrency; i++) next();
     }
 
-    // ========== 链接数据加载（缓存优先 + 网络刷新，后台改动能立即失效缓存） ==========
-    function loadLinks() {
-        var cache = readJSON(CONFIG.linksCacheKey, null);
-        // 后台保存后写入时间戳，使首页旧缓存立即失效（同源 localStorage 共享）
+    // ========== 链接数据（stale-while-revalidate） ==========
+    // 快照立即渲染（无论新旧）→ 消除白屏；新鲜且未被后台更新过则跳过网络；否则后台刷新
+    function loadLinks(force) {
+        var snap = readJSON(CONFIG.linksCacheKey, null);
         var updatedAt = Number(localStorage.getItem(CONFIG.linksUpdatedKey) || 0);
-        var rendered = false;
+        var hasSnap = !!(snap && Array.isArray(snap.links) && snap.links.length);
+        var snapTs = (snap && snap.ts) || 0;
 
-        var cacheUsable = cache && Array.isArray(cache.links) && cache.ts
-            && (Date.now() - cache.ts < CONFIG.linksCacheTtl)
-            && (cache.ts >= updatedAt);
+        // 1) 先渲染快照（zero-wait，不闪不白）
+        if (hasSnap) renderLinks(snap.links, false);
 
-        if (cacheUsable) {
-            renderLinks(cache.links);
-            rendered = true;
-        }
+        // 2) 快照新鲜且后台未改动 → 不必再发请求
+        if (!force && hasSnap && snapTs >= updatedAt && (Date.now() - snapTs < CONFIG.linksCacheMaxAge)) return;
 
+        // 3) 后台刷新
         var ctrl = new AbortController();
-        var timer = setTimeout(function () { ctrl.abort(); }, 10000);
+        var timer = setTimeout(function () { ctrl.abort(); }, CONFIG.apiTimeout);
 
         fetch(CONFIG.apiLinks, { signal: ctrl.signal, cache: 'no-store' })
             .then(function (r) { if (!r.ok) throw new Error('API ' + r.status); return r.json(); })
@@ -752,14 +804,13 @@ body .texture {
                 clearTimeout(timer);
                 if (!data || !Array.isArray(data.links)) throw new Error('bad payload');
                 writeJSON(CONFIG.linksCacheKey, { links: data.links, ts: Date.now() });
-                renderLinks(data.links);
+                renderLinks(data.links, !hasSnap);   // 首屏入场才用动画
             })
             .catch(function (e) {
                 clearTimeout(timer);
                 console.warn('链接加载失败:', e.message);
-                // 仅在完全无可用数据时才用默认链接兑底；有缓存则保留缓存，
-                // 勿用假数据覆盖真实结果（否则用户看到“默认地址”误以为数据丢失）
-                if (!rendered) renderLinks(CONFIG.defaultLinks);
+                if (hasSnap) return;                 // 已有内容 → 保持不动，下次访问再试
+                renderPlaceholder('error');          // 完全无内容 → 明确错误态 + 重试
             });
     }
 
