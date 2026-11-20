@@ -278,7 +278,6 @@ const ROUTES = {
 // Worker 响应（实测 HTML 恒为 cf-cache-status: DYNAMIC，每次访问都回源，TTFB 0.8~1.9s）。
 // 必须显式使用 Cache API 写入边缘缓存；部署新版本时 Pages 会清项目缓存。
 function assetsTtl(pathname) {
-  if (pathname.startsWith('/fonts/')) return 31536000; // 字体指纹化，长缓存
   if (pathname === '/' || pathname === '/index.html') return 60; // 含注入的链接数据，需短缓存
   return 300; // 其他 HTML / JS
 }

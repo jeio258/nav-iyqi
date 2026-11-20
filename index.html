@@ -15,18 +15,18 @@
 <link rel="preconnect" href="https://t.alcy.cc">
 <link rel="dns-prefetch" href="https://v1.hitokoto.cn">
 
-<!-- 字体：本地自托管（非阻塞加载，media=print 技巧），消除 Google Fonts 外链（国内慢/不稳） -->
-<link rel="stylesheet" href="/fonts/fonts.css" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="/fonts/fonts.css"></noscript>
+<!-- 字体：仅标题字体 LXGW WenKai 走 zstatic 分片按需加载；正文/等宽用系统字体（零下载） -->
 <link rel="stylesheet" href="https://s4.zstatic.net/ajax/libs/lxgw-wenkai-webfont/1.7.0/lxgwwenkai-regular.min.css" media="print" onload="this.media='all'">
 
 <style>
 /* Hallmark · macrostructure: Index-First · genre: editorial · theme: warm-paper · design-system: design.md */
 /* ========== CSS 变量 ========== */
 :root {
+    /* 正文/等宽用系统字体：零下载、零 FOIT（原自托管 Inter+JetBrains 共 103KB，
+       弱网下占用首屏带宽 2~3s）。标题保留 LXGW WenKai（走 zstatic 按 unicode-range 分片按需加载） */
     --font-display: "LXGW WenKai", "Noto Serif SC", "PingFang SC", serif;
-    --font-body:    "Inter", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
-    --font-mono:    "JetBrains Mono", "SF Mono", "Cascadia Code", monospace;
+    --font-body:    -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, "Segoe UI", Roboto, sans-serif;
+    --font-mono:    ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
 
     --color-paper:       oklch(97% 0.012 80);
     --color-paper-2:     oklch(93% 0.014 78);
