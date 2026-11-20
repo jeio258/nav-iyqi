@@ -304,7 +304,13 @@ async function injectBoot(html, env) {
   }
   // 转义 < 防止数据里出现 </script> 提前闭合（JSON 内 < 一律转 \u003c 仍为合法 JSON）
   const boot = JSON.stringify({ links, settings }).replace(/</g, '\\u003c');
-  return html.replace('</head>', `<script>window.__BOOT__=${boot}</script></head>`);
+  // CSP 阻止 Cloudflare 自动注入的 Web Analytics beacon：它是 type=module（defer 语义），
+  // 实测其加载完成时刻（~2300ms）正是 DCL 触发点，白占 1.2~1.3s 首访时间。
+  // 仅限定 script-src（不影响 img/font/connect），放行同源与内联脚本。
+  const csp = '<meta http-equiv="Content-Security-Policy" content="script-src \'self\' \'unsafe-inline\'">';
+  return html
+    .replace('</head>', `<script>window.__BOOT__=${boot}</script></head>`)
+    .replace('<head>', '<head>' + csp);
 }
 
 async function serveAsset(request, env, pathname, method) {
