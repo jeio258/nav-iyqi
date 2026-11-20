@@ -274,12 +274,34 @@ const ROUTES = {
     json({ status: 'ok', timestamp: new Date().toISOString(), kv: !!env.NAV_LINKS })
 };
 
-// 静态资源边缘缓存：Pages 高级模式下静态资源经 Worker 出，响应默认无 Cache-Control，
-// Cloudflare 边缘不缓存 → 每次访问都回源（实测 HTML TTFB 0.8~1.9s、字体 72KB 要 2.9s）。
-// 显式设置 Cache-Control 后边缘缓存生效，回访由边缘直出；部署新版本时 Pages 自动清缓存
-function cacheHeadersFor(pathname) {
-  if (pathname.startsWith('/fonts/')) return 'public, max-age=31536000, immutable';
-  return 'public, max-age=300'; // HTML 与其他静态文件
+// 静态资源边缘缓存：Pages 高级模式下所有请求经 Worker 出，Cloudflare 不会自动缓存
+// Worker 响应（实测 HTML 恒为 cf-cache-status: DYNAMIC，每次访问都回源，TTFB 0.8~1.9s）。
+// 必须显式使用 Cache API 写入边缘缓存；部署新版本时 Pages 会清项目缓存。
+function assetsTtl(pathname) {
+  if (pathname.startsWith('/fonts/')) return 31536000; // 字体指纹化，长缓存
+  return 300; // HTML / JS 等
+}
+
+async function serveAsset(request, env, pathname, method) {
+  if (!env.ASSETS) return new Response('Not Found', { status: 404 });
+  // 只缓存幂等 GET；API 与其他方法直达源
+  if (method !== 'GET') return env.ASSETS.fetch(request);
+
+  const ttl = assetsTtl(pathname);
+  const cache = caches.default;
+  const cacheKey = new Request(new URL(pathname, request.url).toString(), { method: 'GET' });
+
+  const hit = await cache.match(cacheKey);
+  if (hit) return hit;
+
+  const response = await env.ASSETS.fetch(request);
+  // 仅缓存 200/3xx；ASSETS 响应头不可变，必须 new Response 包一层
+  if (response.status !== 200 && !(response.status >= 300 && response.status < 400)) return response;
+
+  const cached = new Response(response.body, response);
+  cached.headers.set('Cache-Control', 'public, max-age=' + ttl);
+  try { await cache.put(cacheKey, cached.clone()); } catch (e) { /* 缓存失败不影响响应 */ }
+  return cached;
 }
 
 export default {
@@ -289,18 +311,9 @@ export default {
 
     if (method === 'OPTIONS') return new Response(null, { headers: CORS });
 
-    // 非 /api/ 路径交给静态资源（Pages 高级模式），GET 200 响应加边缘缓存头
-    // ASSETS 响应的 headers 不可变，必须 new Response 包一层才能改
+    // 非 /api/ 路径交给静态资源（Pages 高级模式），走边缘缓存
     if (!pathname.startsWith('/api/')) {
-      if (!env.ASSETS) return new Response('Not Found', { status: 404 });
-      const response = await env.ASSETS.fetch(request);
-      // 200 与 3xx（如 /admin.html → /admin 的 clean-URL 重定向）都可安全边缘缓存
-      if (method === 'GET' && (response.status === 200 || response.status >= 300 && response.status < 400)) {
-        const cached = new Response(response.body, response);
-        cached.headers.set('Cache-Control', cacheHeadersFor(pathname));
-        return cached;
-      }
-      return response;
+      return serveAsset(request, env, pathname, method);
     }
 
     const handler = ROUTES[`${method} ${pathname}`];
