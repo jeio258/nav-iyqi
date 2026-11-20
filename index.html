@@ -785,19 +785,38 @@ body .texture {
         for (var i = 0; i < CONFIG.iconConcurrency; i++) next();
     }
 
-    // ========== 链接数据（stale-while-revalidate） ==========
-    // 快照立即渲染（无论新旧）→ 消除白屏；新鲜且未被后台更新过则跳过网络；否则后台刷新
+    // ========== 链接数据（SSR 注入优先 → 本地快照 → 后台刷新） ==========
+    // 首访：HTML 里已由 Worker 注入 __BOOT__，到达即渲染，无需等 /api/links
+    // 回访：优先注入数据，回退 localStorage 快照；两者都用内容签名去重避免闪烁
+    function bootData() {
+        return (typeof window !== 'undefined' && window.__BOOT__) || null;
+    }
+
     function loadLinks(force) {
+        var boot = bootData();
         var snap = readJSON(CONFIG.linksCacheKey, null);
         var updatedAt = Number(localStorage.getItem(CONFIG.linksUpdatedKey) || 0);
-        var hasSnap = !!(snap && Array.isArray(snap.links) && snap.links.length);
+
+        var bootLinks = boot && Array.isArray(boot.links) && boot.links.length ? boot.links : null;
+        var snapLinks = snap && Array.isArray(snap.links) && snap.links.length ? snap.links : null;
         var snapTs = (snap && snap.ts) || 0;
 
-        // 1) 先渲染快照（zero-wait，不闪不白）
-        if (hasSnap) renderLinks(snap.links, false);
+        // 1) 注入数据（服务端读的 KV，最新）→ 立即渲染
+        if (bootLinks) {
+            renderLinks(bootLinks, false);
+            writeJSON(CONFIG.linksCacheKey, { links: bootLinks, ts: Date.now() });
+        } else if (snapLinks) {
+            renderLinks(snapLinks, false);
+        }
 
-        // 2) 快照新鲜且后台未改动 → 不必再发请求
-        if (!force && hasSnap && snapTs >= updatedAt && (Date.now() - snapTs < CONFIG.linksCacheMaxAge)) return;
+        var hasData = !!(bootLinks || snapLinks);
+
+        // 2) 无注入但有新鲜快照且后台未改动 → 跳过请求（纯性能优化）
+        //    有注入时总是后台刷新：HTML 边缘缓存最长 60s，注入数据可能滞后；
+        //    刷新由内容签名去重，相同内容不重建 DOM，无闪烁代价
+        if (!force && !bootLinks && hasData && snapTs >= updatedAt && (Date.now() - snapTs < CONFIG.linksCacheMaxAge)) return;
+
+        // 3) 后台刷新
 
         // 3) 后台刷新
         var ctrl = new AbortController();
@@ -809,12 +828,12 @@ body .texture {
                 clearTimeout(timer);
                 if (!data || !Array.isArray(data.links)) throw new Error('bad payload');
                 writeJSON(CONFIG.linksCacheKey, { links: data.links, ts: Date.now() });
-                renderLinks(data.links, !hasSnap);   // 首屏入场才用动画
+                renderLinks(data.links, !hasData);   // 仅完全无数据时用入场动画
             })
             .catch(function (e) {
                 clearTimeout(timer);
                 console.warn('链接加载失败:', e.message);
-                if (hasSnap) return;                 // 已有内容 → 保持不动，下次访问再试
+                if (hasData) return;                 // 已有内容 → 保持不动，下次访问再试
                 renderPlaceholder('error');          // 完全无内容 → 明确错误态 + 重试
             });
     }
@@ -933,7 +952,13 @@ body .texture {
     }
 
     function loadSettings() {
-        applySettings(readJSON(CONFIG.settingsKey, null));
+        var boot = bootData();
+        if (boot && boot.settings) {
+            writeJSON(CONFIG.settingsKey, boot.settings);
+            applySettings(boot.settings);
+        } else {
+            applySettings(readJSON(CONFIG.settingsKey, null));
+        }
 
         fetch(CONFIG.apiSettings)
             .then(function (r) { if (!r.ok) throw new Error('API ' + r.status); return r.json(); })

@@ -279,7 +279,32 @@ const ROUTES = {
 // 必须显式使用 Cache API 写入边缘缓存；部署新版本时 Pages 会清项目缓存。
 function assetsTtl(pathname) {
   if (pathname.startsWith('/fonts/')) return 31536000; // 字体指纹化，长缓存
-  return 300; // HTML / JS 等
+  if (pathname === '/' || pathname === '/index.html') return 60; // 含注入的链接数据，需短缓存
+  return 300; // 其他 HTML / JS
+}
+
+// 首屏数据注入：把 KV 里的链接与设置写进 HTML，首访无需等 /api/links
+// （原逻辑 HTML 到达后必须等 API 才渲染，实测白屏/骨架空窗 600~1300ms）
+async function injectBoot(html, env) {
+  let links = DEFAULT_LINKS;
+  let settings = DEFAULT_SETTINGS;
+  try {
+    if (env.NAV_LINKS) {
+      const [rawLinks, rawSettings] = await Promise.all([
+        env.NAV_LINKS.get('links'),
+        env.NAV_LINKS.get('settings')
+      ]);
+      const parsedLinks = rawLinks ? JSON.parse(rawLinks) : null;
+      const parsedSettings = rawSettings ? JSON.parse(rawSettings) : null;
+      if (Array.isArray(parsedLinks)) links = parsedLinks;
+      if (parsedSettings && typeof parsedSettings === 'object') settings = parsedSettings;
+    }
+  } catch (e) {
+    console.warn('[Worker] 首屏数据注入失败，用默认值:', e.message);
+  }
+  // 转义 < 防止数据里出现 </script> 提前闭合（JSON 内 < 一律转 \u003c 仍为合法 JSON）
+  const boot = JSON.stringify({ links, settings }).replace(/</g, '\\u003c');
+  return html.replace('</head>', `<script>window.__BOOT__=${boot}</script></head>`);
 }
 
 async function serveAsset(request, env, pathname, method) {
@@ -298,8 +323,16 @@ async function serveAsset(request, env, pathname, method) {
   // 仅缓存 200/3xx；ASSETS 响应头不可变，必须 new Response 包一层
   if (response.status !== 200 && !(response.status >= 300 && response.status < 400)) return response;
 
-  const cached = new Response(response.body, response);
+  const isHtml = pathname === '/' || pathname === '/index.html';
+  let body = response.body;
+  if (isHtml && response.status === 200) {
+    body = await injectBoot(await response.text(), env);
+  }
+
+  const cached = new Response(body, response);
   cached.headers.set('Cache-Control', 'public, max-age=' + ttl);
+  // 注入后 HTML 体积与源不同，移除可能失效的 Content-Length
+  if (isHtml) cached.headers.delete('Content-Length');
   try { await cache.put(cacheKey, cached.clone()); } catch (e) { /* 缓存失败不影响响应 */ }
   return cached;
 }
