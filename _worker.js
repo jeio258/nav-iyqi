@@ -274,6 +274,14 @@ const ROUTES = {
     json({ status: 'ok', timestamp: new Date().toISOString(), kv: !!env.NAV_LINKS })
 };
 
+// 静态资源边缘缓存：Pages 高级模式下静态资源经 Worker 出，响应默认无 Cache-Control，
+// Cloudflare 边缘不缓存 → 每次访问都回源（实测 HTML TTFB 0.8~1.9s、字体 72KB 要 2.9s）。
+// 显式设置 Cache-Control 后边缘缓存生效，回访由边缘直出；部署新版本时 Pages 自动清缓存
+function cacheHeadersFor(pathname) {
+  if (pathname.startsWith('/fonts/')) return 'public, max-age=31536000, immutable';
+  return 'public, max-age=300'; // HTML 与其他静态文件
+}
+
 export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
@@ -281,10 +289,18 @@ export default {
 
     if (method === 'OPTIONS') return new Response(null, { headers: CORS });
 
-    // 非 /api/ 路径交给静态资源（Pages 高级模式）
+    // 非 /api/ 路径交给静态资源（Pages 高级模式），GET 200 响应加边缘缓存头
+    // ASSETS 响应的 headers 不可变，必须 new Response 包一层才能改
     if (!pathname.startsWith('/api/')) {
-      if (env.ASSETS) return env.ASSETS.fetch(request);
-      return new Response('Not Found', { status: 404 });
+      if (!env.ASSETS) return new Response('Not Found', { status: 404 });
+      const response = await env.ASSETS.fetch(request);
+      // 200 与 3xx（如 /admin.html → /admin 的 clean-URL 重定向）都可安全边缘缓存
+      if (method === 'GET' && (response.status === 200 || response.status >= 300 && response.status < 400)) {
+        const cached = new Response(response.body, response);
+        cached.headers.set('Cache-Control', cacheHeadersFor(pathname));
+        return cached;
+      }
+      return response;
     }
 
     const handler = ROUTES[`${method} ${pathname}`];
