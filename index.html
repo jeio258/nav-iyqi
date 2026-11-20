@@ -682,9 +682,14 @@ body .texture {
             a.rel = 'noopener noreferrer';
             a.setAttribute('role', 'listitem');
             a.title = name;
-            // 仅首屏入场用逐个延迟动画；静默更新不加延迟，避免二次闪动
+            // 仅首屏入场用逐个延迟动画；静默更新不加延迟。
+            // 基础样式 opacity:0 依赖 linkIn 动画回填为 1，禁用动画时必须显式恢复，否则卡片永久不可见
             if (animate) a.style.animationDelay = (0.06 * i).toFixed(2) + 's';
-            else a.style.animation = 'none';
+            else {
+                a.style.animation = 'none';
+                a.style.opacity = '1';
+                a.style.transform = 'none';
+            }
 
             var avatar = document.createElement('span');
             avatar.className = 'link-avatar';
