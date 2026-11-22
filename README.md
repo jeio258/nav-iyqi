@@ -13,14 +13,15 @@
 - 🖼️ 动态背景淡入淡出轮转（12s 间隔）
 - 💬 一言 API 集成（自动回退本地句子）
 - ⏱️ 网站运行时间统计
-- 🔗 导航链接云端管理（Cloudflare KV 持久化）
+- 🔗 导航链接云端管理（KV 持久化）
 - 📝 站点标题/副标题/建站日期自定义
-- 🔐 JWT 认证后台（速率限制 + 服务端验证）
-- 🛡️ 全链路 XSS 防护 + 输入清理
-- ☁️ Cloudflare Pages + Workers 零服务器部署
+- 🔐 JWT 认证后台（登录限流 + 服务端令牌验证）
+- 🛡️ XSS 防护：渲染走 DOM API + `textContent`，不拼接 HTML
+- ☁️ 双平台部署：Cloudflare Pages/Workers ／ 腾讯云 EdgeOne Makers（同一仓库）
 - 💾 增删改自动同步到 KV
 - 📱 响应式设计，适配移动端
-- ⚡ 延迟加载优化：首屏优先，背景/一言异步
+- ⚡ 首屏优化：链接数据注入 HTML（免等接口）、静态资源边缘缓存、图标按需小并发加载
+- 🔍 部署自诊断：`/api/health` 自述 KV 绑定、读写权限与环境变量状态
 
 ---
 
@@ -209,7 +210,25 @@ hitokotoInterval: 10000,   // 一言刷新间隔（毫秒）
 
 ### 修改默认链接
 
-编辑 `_worker.js` 中的 `DEFAULT_LINKS` 数组（KV 不可用时的回退数据）。
+编辑 **`shared/core.js`** 中的 `DEFAULT_LINKS` 数组（KV 不可用时的回退数据），
+然后执行 `npm run build` 同步到两平台产物。
+
+> 改为后台管理页维护即可，无需改代码——`DEFAULT_LINKS` 只是 KV 异常时的兜底。
+
+### 修改存储键 / 接口路径 / 主题
+
+编辑 **`shared/frontend.js`** 中的 `NAV` 常量对象：
+
+```javascript
+NAV.storage   // localStorage 键名（前后台必须一致）
+NAV.api       // 接口路径
+NAV.themeColor // 深浅色下的地址栏颜色
+```
+
+改完执行 `npm run build`，会注入到 `index.html` 与 `admin.html`。
+
+> 切勿直接在页面里改这些值：两页面 + 后台脚本共用同一份定义，
+> 分散修改会出现「后台写入与前台读取的键不一致」这类问题。
 
 ---
 
@@ -223,7 +242,50 @@ hitokotoInterval: 10000,   // 一言刷新间隔（毫秒）
 | PUT | `/api/links` | 更新链接列表 | ✅ | - |
 | GET | `/api/settings` | 获取站点设置 | ❌ | - |
 | PUT | `/api/settings` | 更新站点设置 | ✅ | - |
-| GET | `/api/health` | 健康检查 | ❌ | - |
+| GET | `/api/health` | 健康检查 + 部署自诊断 | ❌ | - |
+
+### 健康检查 / 部署自诊断
+
+`GET /api/health` 不仅返回服务状态，还**自述部署状态**，用于一次性定位
+「KV 绑定 / 环境变量 / 读写权限」问题，无需来回猜测。
+
+```bash
+curl https://your-domain.com/api/health
+```
+
+EdgeOne 部署的完整返回示例：
+
+```json
+{
+  "status": "ok",
+  "kv": true,
+  "kvBound": true,
+  "kvSources": {
+    "globalNAV_LINKS": "object",
+    "contextEnvNAV_LINKS": "absent"
+  },
+  "envs": { "ADMIN_USERNAME": true, "ADMIN_PASSWORD": true, "JWT_SECRET": true },
+  "kvReadable": true,
+  "kvProbeValue": "null",
+  "expectedBindingName": "NAV_LINKS",
+  "runtime": "edgeone"
+}
+```
+
+字段含义：
+
+| 字段 | 含义 |
+|------|------|
+| `kv` / `kvBound` | 是否成功取得 KV 对象（`true` 即绑定成功） |
+| `kvSources.globalNAV_LINKS` | 全局变量形态状态：`object` 可用 / `undefined` 未注入 / `throw` 异常 |
+| `kvSources.contextEnvNAV_LINKS` | `context.env` 形态状态：`object` / `absent` 无此变量 / `not-kv` 有值但不是 KV 对象 |
+| `kvReadable` | 实际读一次的结果，验证读写权限 |
+| `kvProbeValue` | 探测键的值，`null` 表示键不存在（正常，不代表绑定失败） |
+| `envs` | 三个环境变量是否就位（只报有无，不回显值） |
+| `expectedBindingName` | 控制台里应填的绑定变量名 |
+
+> **反直觉提醒**：`kvProbeValue: "null"` 只说明该探测键没有数据，
+> **不代表 KV 未绑定**。以 `kvBound` 与 `kvReadable` 为准。
 
 ### 登录
 
@@ -260,10 +322,10 @@ curl -X PUT https://your-domain.com/api/links \
 |------|------|
 | JWT 认证 | HMAC-SHA256 签名，1 小时过期 |
 | 速率限制 | 登录接口 8次/分钟/IP，返回 429 |
-| XSS 防护 | 全链路 escapeHtml()，输入截断清理 |
-| URL 校验 | 仅允许 http/https 协议 |
-| 环境变量加密 | 凭据通过 `wrangler secret` 加密存储 |
-| HTTPS | Cloudflare 自动提供 SSL 证书 |
+| XSS 防护 | 渲染统一走 DOM API + `textContent`（不拼接 HTML）；服务端只做截断 |
+| URL 校验 | 仅允许 http/https 协议（拒绝 `javascript:` 等） |
+| 凭据存储 | Cloudflare 用 `wrangler pages secret`；EdgeOne 用控制台环境变量，均不回显 |
+| HTTPS | Cloudflare / EdgeOne 均自动签发证书 |
 | CORS | 已配置跨域访问控制 |
 | 数量限制 | 链接上限 200 条，字段长度限制 |
 
@@ -279,16 +341,38 @@ curl -X PUT https://your-domain.com/api/links \
 ## 🧪 本地开发
 
 ```bash
-# 1. 创建本地环境变量文件（首次必须）
+# 1. 安装依赖
+npm install
+
+# 2. 创建本地环境变量文件（首次必须）
 cp .dev.vars.example .dev.vars
 # 编辑 .dev.vars 填入实际值
 
-# 2. 启动开发服务器
-wrangler pages dev .
+# 3. 启动开发服务器
+npx wrangler pages dev . --local
 # 访问 http://localhost:8788
 ```
 
-> 本地开发时 KV 存储不可用，将使用默认链接数据。
+> `--local` 下 wrangler 会提供**本地 KV 模拟**，读写与线上一致（启动后访问
+> `/api/health` 应看到 `"kv": true`）。只有 KV 绑定异常时才回退默认链接数据。
+
+### 修改代码后重新生成产物
+
+后端逻辑与前端公共层是「单一源生成」模式，**改了源文件必须重新生成**：
+
+```bash
+npm run build
+```
+
+| 要改什么 | 改哪里 |
+|----------|--------|
+| 后端逻辑（JWT / 校验 / 接口） | `shared/core.js` |
+| 存储键 / 接口路径 / 主题逻辑 | `shared/frontend.js` |
+| 页面文案与样式 | `index.html` / `admin.html` |
+| 改完统一执行 | `npm run build` |
+
+> 生成物（`_worker.js`、`edge-functions/api/*.js`、以及两个 HTML 里的
+> `@inject:frontend-common` 注入区）**请勿手改**，下次构建会被覆盖。
 
 ---
 
@@ -308,6 +392,12 @@ wrangler pages dev .
 2. **创建命名空间**
 3. 回项目 → **KV 存储** → **绑定命名空间** → **变量名必须填 `NAV_LINKS`**
 
+> **KV 的注入形态**（实测确认）：绑定的「变量名」会作为**全局变量**注入运行环境，
+> 代码里直接写 `NAV_LINKS.get(...)` 即可（这也是官方示例的写法）。
+> 本项目同时兼容 `context.env.NAV_LINKS` 形态，两种都能取到。
+>
+> 变量名**区分大小写、不能带空格**，必须与代码里的 `NAV_LINKS` 完全一致。
+
 ### 步骤 3：配置环境变量（必须）
 项目 → **设置** → **环境变量**，添加：
 
@@ -318,22 +408,36 @@ JWT_SECRET=至少32位随机字符串
 ```
 
 ### 步骤 4：验证
-访问 `你的域名/api/health`，应返回：
+访问 `你的域名/api/health`，重点看三个字段：
 
 ```json
-{"status":"ok","timestamp":"...","kv":true,"runtime":"edgeone"}
+{ "kvBound": true, "kvReadable": true, "runtime": "edgeone" }
 ```
 
-`kv: true` 表示 KV 绑定成功，`runtime: edgeone` 确认运行在 EdgeOne。
+| 字段 | 期望值 | 含义 |
+|------|--------|------|
+| `kvBound` | `true` | KV 绑定成功 |
+| `kvReadable` | `true` | 读写权限正常 |
+| `runtime` | `"edgeone"` | 确认跑的是 EdgeOne 版本 |
+
+再对照 `kvSources` 与 `envs`，可精确看出卡在哪一环（字段详解见
+[健康检查 / 部署自诊断](#健康检查--部署自诊断)）。
+
+最后做一次真实闭环：**登录后台 → 添加一个链接 → 保存**，
+出现「✅ 已同步到云端」即全部链路打通。
 
 ### 部署问题对照表
 
 | 现象 | 原因 | 解决 |
 |------|------|------|
-| `/api/health` 返回 `kv: false` | KV 未绑定 | 步骤 2，变量名必须为 `NAV_LINKS` |
-| 登录报「服务器未配置环境变量」 | 步骤 3 未做 | 补环境变量 |
-| 保存报「KV 存储未绑定」 | KV 未开通/未绑定 | 步骤 2 |
+| `kvSources` 两项都是 `undefined` / `absent` | 绑定未生效 | 步骤 2，变量名必须为 `NAV_LINKS` |
+| `contextEnvNAV_LINKS: "not-kv"` | 变量名对了但绑的不是 KV | 检查绑的是命名空间，不是其他资源 |
+| `kvBound: true` 但 `kvReadable: false` | 绑定成功但无读写权限 | 检查命名空间额度/权限 |
+| `envs` 中有 `false` | 环境变量缺失 | 步骤 3 补齐 |
+| 登录报「服务器未配置环境变量」 | 同上 | 同上 |
+| 保存报「KV 存储未绑定」 | 跑的是旧代码 | 控制台**重新部署**到最新提交 |
 | `/api/health` 404 | 函数目录未识别 | 确认仓库含 `edge-functions/api/health.js` |
+| `kvProbeValue: "null"` | **这不是错误** | 探测键无数据而已，看 `kvBound` 即可 |
 
 ---
 
@@ -358,6 +462,23 @@ A: 确认 wrangler.toml 中 KV namespace id 是否正确，且已点击保存。
 **Q: 如何重置 KV 数据**
 
 A: Cloudflare Dashboard → Workers & Pages → KV → NAV_LINKS → 删除 `links` 和 `settings` 键。
+EdgeOne：控制台 → 存储 - KV → 命名空间详情 → 删除 `links` 与 `settings` 记录。
+
+**Q: EdgeOne 上控制台显示 KV 里没有数据，是不是没绑定成功？**
+
+A: **不是。**「KV 里没数据」与「KV 未绑定」是两件事。以 `/api/health` 的
+`kvBound` 与 `kvReadable` 为准——两者为 `true` 就说明绑定与读写都正常，
+只是还没写入过数据（首次保存链接后才会出现 `links` / `settings` 键）。
+
+**Q: EdgeOne 后台保存链接报「KV 存储未绑定」，但 health 显示已绑定**
+
+A: 说明那次请求跑的是**旧版本代码**。在 EdgeOne 控制台**重新部署**
+（触发一次构建），确保部署到最新提交后再试。
+
+**Q: 两个平台（Cloudflare / EdgeOne）会互相影响吗？**
+
+A: 不会。`_worker.js` 供 Cloudflare，`edge-functions/` 供 EdgeOne，
+各自独立、代码来源同为 `shared/`。同一个仓库可同时部署到两处。
 
 ---
 
@@ -366,8 +487,12 @@ A: Cloudflare Dashboard → Workers & Pages → KV → NAV_LINKS → 删除 `lin
 ### v1.2.0 (2026-11)
 
 - ☁️ 新增腾讯云 EdgeOne Makers 部署支持（`edge-functions/` + `edgeone.json`）
-- 🔧 后端逻辑收敛到唯一来源 `shared/core.js`，由生成器产出两平台产物，消除双份实现漂移
-- ⚡ 首屏：Worker 注入链接数据到 HTML（首访免等 API）、Cache API 边缘缓存、
+- 🔧 代码结构：后端逻辑收敛到 `shared/core.js`，前端公共层收敛到 `shared/frontend.js`
+  （存储键 / 接口路径 / 主题），统一由 `npm run build` 生成到两平台产物与两个页面，
+  消除「同一存储键多处硬编码」导致的改 A 坏 B
+- 🔍 `/api/health` 升级为部署自诊断：自述 KV 绑定形态、读写权限、环境变量就位情况
+- 🐛 EdgeOne KV 取值兼容「全局变量」与「context.env」两种注入形态，并校验值确为 KV 对象
+- ⚡ 首屏：Worker 注入链接数据到 HTML（首访免等接口）、Cache API 边缘缓存、
   CSP 阻断统计脚本、移除 103KB 自托管字体（总传输 135KB → 32KB）
 - 🐛 修复有缓存路径卡片不可见（禁用入场动画未恢复 opacity）
 - 🐛 修复后台改链接后首页需刷新两遍（no-store + 更新时间戳失效缓存）
