@@ -154,11 +154,19 @@ const DEFAULT_SETTINGS = {
 // ===== EdgeOne 适配层 =====
 // KV 绑定：控制台绑定命名空间时填的「变量名」= 运行时全局变量名（NAV_LINKS）。
 // 同时兜底 context.env.NAV_LINKS，两种取值方式都可用。
+// EdgeOne 绑定的 KV 以「变量名」注入为**全局变量**（官方示例直接写 my_kv）；
+// 也兼容挂在 context.env 上的形态。两种形态都认，避免绑定方式差异导致取不到。
 function getKV(context) {
-  try {
-    if (typeof NAV_LINKS !== 'undefined' && NAV_LINKS) return NAV_LINKS;
-  } catch (e) { /* 未绑定 */ }
-  return (context && context.env && context.env.NAV_LINKS) || null;
+  var candidates = [];
+  try { candidates.push({ via: 'global', kv: typeof NAV_LINKS !== 'undefined' ? NAV_LINKS : null }); }
+  catch (e) { candidates.push({ via: 'global-throw', kv: null }); }
+  try { candidates.push({ via: 'context.env', kv: (context && context.env && context.env.NAV_LINKS) || null }); }
+  catch (e) { candidates.push({ via: 'context.env-throw', kv: null }); }
+  for (var i = 0; i < candidates.length; i++) {
+    var kv = candidates[i].kv;
+    if (kv && typeof kv.get === 'function' && typeof kv.put === 'function') return kv;
+  }
+  return null;
 }
 
 const CORS_HEADERS = {

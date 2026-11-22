@@ -283,11 +283,19 @@ const EDGEONE_PRELUDE = `
 // ===== EdgeOne 适配层 =====
 // KV 绑定：控制台绑定命名空间时填的「变量名」= 运行时全局变量名（NAV_LINKS）。
 // 同时兜底 context.env.NAV_LINKS，两种取值方式都可用。
+// EdgeOne 绑定的 KV 以「变量名」注入为**全局变量**（官方示例直接写 my_kv）；
+// 也兼容挂在 context.env 上的形态。两种形态都认，避免绑定方式差异导致取不到。
 function getKV(context) {
-  try {
-    if (typeof NAV_LINKS !== 'undefined' && NAV_LINKS) return NAV_LINKS;
-  } catch (e) { /* 未绑定 */ }
-  return (context && context.env && context.env.NAV_LINKS) || null;
+  var candidates = [];
+  try { candidates.push({ via: 'global', kv: typeof NAV_LINKS !== 'undefined' ? NAV_LINKS : null }); }
+  catch (e) { candidates.push({ via: 'global-throw', kv: null }); }
+  try { candidates.push({ via: 'context.env', kv: (context && context.env && context.env.NAV_LINKS) || null }); }
+  catch (e) { candidates.push({ via: 'context.env-throw', kv: null }); }
+  for (var i = 0; i < candidates.length; i++) {
+    var kv = candidates[i].kv;
+    if (kv && typeof kv.get === 'function' && typeof kv.put === 'function') return kv;
+  }
+  return null;
 }
 
 const CORS_HEADERS = {
@@ -366,14 +374,44 @@ const EDGEONE_HANDLERS = {
     methods: 'GET',
     desc: '健康检查：确认部署成功、KV 是否绑定',
     body: `
-export default function onRequest(context) {
+export default async function onRequest(context) {
   if (context.request.method === 'OPTIONS') return preflight();
-  return json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    kv: !!getKV(context),
-    runtime: 'edgeone'
-  });
+  var env = (context && context.env) || {};
+  var kv = getKV(context);
+  var diagnostics = {
+    runtime: 'edgeone',
+    kvBound: !!kv,
+    // 绑定排查用：逐项列出可能的取值来源是否可用
+    kvSources: {
+      globalNAV_LINKS: (function () {
+        try { return typeof NAV_LINKS !== 'undefined' ? (typeof NAV_LINKS.get === 'function' ? 'object' : 'not-kv') : 'undefined'; }
+        catch (e) { return 'throw'; }
+      })(),
+      contextEnvNAV_LINKS: env.NAV_LINKS ? (typeof env.NAV_LINKS.get === 'function' ? 'object' : 'not-kv') : 'absent'
+    },
+    // 环境变量是否就位（只报有无，不回显值）
+    envs: {
+      ADMIN_USERNAME: !!env.ADMIN_USERNAME,
+      ADMIN_PASSWORD: !!env.ADMIN_PASSWORD,
+      JWT_SECRET: !!env.JWT_SECRET
+    },
+    // 绑定变量名必须与此处一致，否则取不到
+    expectedBindingName: 'NAV_LINKS'
+  };
+
+  // KV 可用时实际读写一次，确认权限正常
+  if (kv) {
+    try {
+      var probe = await kv.get('__health_probe__');
+      diagnostics.kvReadable = true;
+      diagnostics.kvProbeValue = probe === null ? 'null' : String(probe).substring(0, 40);
+    } catch (e) {
+      diagnostics.kvReadable = false;
+      diagnostics.kvReadError = e.message;
+    }
+  }
+
+  return json(Object.assign({ status: 'ok', timestamp: new Date().toISOString(), kv: !!kv }, diagnostics));
 }`
   },
   'auth/login.js': {
