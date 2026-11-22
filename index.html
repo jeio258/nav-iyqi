@@ -28,6 +28,8 @@
     --font-body:    -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, "Segoe UI", Roboto, sans-serif;
     --font-mono:    ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
 
+    /* 注意：本变量块与 admin.html 的 :root 是同一套设计令牌，修改主题色需两处同步。
+       刻意内联而非抽公共 CSS：外链样式会让首屏先无样式渲染（FOUC 闪白） */
     --color-paper:       oklch(97% 0.012 80);
     --color-paper-2:     oklch(93% 0.014 78);
     --color-paper-3:     oklch(88% 0.010 75);

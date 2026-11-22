@@ -32,7 +32,7 @@
 | 后端 | Cloudflare Workers（纯 JS，无外部依赖） |
 | 存储 | Cloudflare KV |
 | 认证 | JWT（HMAC-SHA256） |
-| 部署 | Cloudflare Pages |
+| 部署 | Cloudflare Pages ／ 腾讯云 EdgeOne Makers（二选一，同一仓库均可） |
 
 ---
 
@@ -40,16 +40,26 @@
 
 ```
 nav-iyqi/
-├── index.html          # 主导航页面
-├── admin.html          # 后台管理页面
-├── admin.js            # 后台管理脚本
-├── _worker.js          # Cloudflare Worker API
-├── .dev.vars.example   # 本地开发环境变量模板
-├── wrangler.toml       # Cloudflare 部署配置
-├── package.json        # 项目配置
-├── LICENSE             # MIT 许可证
-└── README.md           # 说明文档
+├── index.html              # 主导航页（内联样式/脚本，避免首屏 FOUC）
+├── admin.html              # 后台管理页
+├── admin.js                # 后台逻辑
+│
+├── shared/core.js          # 【唯一来源】平台无关核心逻辑（JWT/校验/默认数据）
+├── _worker.js              # 【生成】Cloudflare Worker（勿手改）
+├── edge-functions/         # 【生成】EdgeOne 函数（勿手改）
+│   └── api/{health,links,settings}.js, api/auth/{login,verify}.js
+├── edgeone.json            # EdgeOne 部署配置
+├── scripts/build-backends.js  # 生成器：core.js → 两平台产物
+│
+├── wrangler.toml           # Cloudflare 部署配置
+├── .dev.vars.example       # 本地开发环境变量模板
+├── package.json            # 项目配置
+├── LICENSE                 # MIT 许可证
+└── README.md               # 说明文档
 ```
+
+> 带【生成】标记的文件由 `npm run build:backends` 从 `shared/core.js` 产出，
+> 请勿直接修改；改后端逻辑请改 `shared/core.js` 后重新生成。
 
 ---
 
@@ -272,6 +282,51 @@ wrangler pages dev .
 
 ---
 
+## ☁️ 部署到腾讯云 EdgeOne Makers
+
+本项目同时支持 EdgeOne，与 Cloudflare 版并存于同一仓库（`_worker.js` 供 Cloudflare，
+`edge-functions/` 供 EdgeOne，互不干扰）。
+
+### 步骤 1：创建项目
+1. 打开 <https://console.cloud.tencent.com/edgeone/makers>
+2. 创建项目 → **导入 Git 仓库** → 选本仓库、分支 `main`
+3. 构建命令**留空**（无需构建），输出目录填 `./`
+4. 部署
+
+### 步骤 2：开通并绑定 KV（必须）
+1. 控制台 → **存储 - KV** → 首次需点「**立即申请**」开通（免费额度 1GB）
+2. **创建命名空间**
+3. 回项目 → **KV 存储** → **绑定命名空间** → **变量名必须填 `NAV_LINKS`**
+
+### 步骤 3：配置环境变量（必须）
+项目 → **设置** → **环境变量**，添加：
+
+```
+ADMIN_USERNAME=你的管理员用户名
+ADMIN_PASSWORD=你的管理员密码
+JWT_SECRET=至少32位随机字符串
+```
+
+### 步骤 4：验证
+访问 `你的域名/api/health`，应返回：
+
+```json
+{"status":"ok","timestamp":"...","kv":true,"runtime":"edgeone"}
+```
+
+`kv: true` 表示 KV 绑定成功，`runtime: edgeone` 确认运行在 EdgeOne。
+
+### 部署问题对照表
+
+| 现象 | 原因 | 解决 |
+|------|------|------|
+| `/api/health` 返回 `kv: false` | KV 未绑定 | 步骤 2，变量名必须为 `NAV_LINKS` |
+| 登录报「服务器未配置环境变量」 | 步骤 3 未做 | 补环境变量 |
+| 保存报「KV 存储未绑定」 | KV 未开通/未绑定 | 步骤 2 |
+| `/api/health` 404 | 函数目录未识别 | 确认仓库含 `edge-functions/api/health.js` |
+
+---
+
 ## 🐛 常见问题
 
 **Q: 部署后 Worker 报错 / 登录提示"用户名或密码错误"**
@@ -297,6 +352,15 @@ A: Cloudflare Dashboard → Workers & Pages → KV → NAV_LINKS → 删除 `lin
 ---
 
 ## 🔄 更新日志
+
+### v1.2.0 (2026-11)
+
+- ☁️ 新增腾讯云 EdgeOne Makers 部署支持（`edge-functions/` + `edgeone.json`）
+- 🔧 后端逻辑收敛到唯一来源 `shared/core.js`，由生成器产出两平台产物，消除双份实现漂移
+- ⚡ 首屏：Worker 注入链接数据到 HTML（首访免等 API）、Cache API 边缘缓存、
+  CSP 阻断统计脚本、移除 103KB 自托管字体（总传输 135KB → 32KB）
+- 🐛 修复有缓存路径卡片不可见（禁用入场动画未恢复 opacity）
+- 🐛 修复后台改链接后首页需刷新两遍（no-store + 更新时间戳失效缓存）
 
 ### v1.1.0 (2025-07)
 

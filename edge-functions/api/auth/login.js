@@ -1,50 +1,13 @@
 // EdgeOne Makers Edge Function —— 路由 /api/auth/login
 // 支持方法：POST；管理员登录，签发 1 小时 JWT
-// 本文件由 scripts/build-edgeone.js 从 _shared.js 生成，请勿手改（改 _shared.js 后重新生成）
+// 本文件由 scripts/build-backends.js 生成（源：shared/core.js + 本脚本适配层），请勿手改
 
-// ===== EdgeOne Edge Functions 共享逻辑（唯一来源）=====
-// 本文件不直接部署；由 scripts/build-edgeone.js 内联到各 api/*.js 中，
-// 生成自包含函数（规避 EdgeOne 的模块 import 兼容风险）。
-// 修改后必须运行：node scripts/build-edgeone.js
+// ===== 平台无关核心逻辑（唯一来源）=====
+// Cloudflare（_worker.js）与 EdgeOne（edge-functions/*）共用本文件。
+// 本文件不直接部署；由 scripts/build-backends.js 内联到两个平台的产物中。
+// 修改后必须运行：node scripts/build-backends.js
 
-// KV 绑定：控制台绑定命名空间时填的「变量名」= 运行时全局变量名（NAV_LINKS）。
-// 同时兜底 context.env.NAV_LINKS，两种取值方式都可用。
-function getKV(context) {
-  try {
-    if (typeof NAV_LINKS !== 'undefined' && NAV_LINKS) return NAV_LINKS;
-  } catch (e) { /* 未绑定 */ }
-  return (context && context.env && context.env.NAV_LINKS) || null;
-}
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-};
-
-// 动态数据统一 no-store，避免浏览器缓存导致后台改动不生效
-function json(data, status, extraHeaders) {
-  return new Response(JSON.stringify(data), {
-    status: status || 200,
-    headers: Object.assign({
-      'Content-Type': 'application/json; charset=UTF-8',
-      'Cache-Control': 'no-store'
-    }, CORS_HEADERS, extraHeaders || {})
-  });
-}
-
-function preflight() {
-  return new Response(null, { headers: CORS_HEADERS });
-}
-
-function isValidUrl(str) {
-  try {
-    const u = new URL(str);
-    return u.protocol === 'http:' || u.protocol === 'https:';
-  } catch (e) { return false; }
-}
-
-// 存储只做截断校验，不做 HTML 转义（转义由渲染端 textContent 负责）
+// 存储只做截断校验，不做 HTML 转义（转义由渲染端 textContent 负责，避免双重转义）
 function sanitizeLink(link) {
   return {
     id: String(link.id || '').substring(0, 100),
@@ -55,7 +18,39 @@ function sanitizeLink(link) {
   };
 }
 
-// ===== JWT（HS256）：base64url 纯 JS 实现，不依赖 btoa/atob =====
+function sanitizeSettings(settings) {
+  return {
+    title: String(settings.title || '').substring(0, 100),
+    subtitle: String(settings.subtitle || '').substring(0, 200),
+    startDate: String(settings.startDate || '').substring(0, 50)
+  };
+}
+
+function isValidUrl(str) {
+  try {
+    const u = new URL(str);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch (e) { return false; }
+}
+
+const MAX_LINKS = 200;
+
+// 逐个校验链接，返回 { links } 或 { error }
+function validateLinks(input) {
+  if (!Array.isArray(input)) return { error: '无效的数据格式' };
+  if (input.length > MAX_LINKS) return { error: `链接数量不能超过 ${MAX_LINKS} 个` };
+  const cleaned = [];
+  for (const link of input) {
+    if (!link || !link.id || !link.name || !link.url) {
+      return { error: '链接数据不完整：需要 id、name、url' };
+    }
+    if (!isValidUrl(link.url)) return { error: '无效的 URL（仅允许 http/https）' };
+    cleaned.push(sanitizeLink(link));
+  }
+  return { links: cleaned };
+}
+
+// ===== JWT（HS256）：base64url 用纯 JS 实现，不依赖 btoa/atob（EdgeOne 未保证提供）=====
 const B64CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 function bytesToB64url(bytes) {
@@ -105,6 +100,8 @@ function hmacKey(secret, usage) {
   );
 }
 
+const TOKEN_TTL_SECONDS = 3600;
+
 async function jwtSign(payload, secret) {
   const head = strToB64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body = strToB64url(JSON.stringify(payload));
@@ -128,8 +125,63 @@ async function jwtVerify(token, secret) {
   return payload;
 }
 
-// ===== 配置与鉴权 =====
-// 环境变量在控制台「项目设置 → 环境变量」配置
+// 签发管理员令牌
+async function issueAdminToken(username, secret) {
+  const now = Math.floor(Date.now() / 1000);
+  return jwtSign(
+    { username, role: 'admin', exp: now + TOKEN_TTL_SECONDS, iat: now },
+    secret
+  );
+}
+
+// ===== 默认数据（KV 不可用时的回退；与前端 CONFIG 中的展示默认值无关联）=====
+const DEFAULT_LINKS = [
+  { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active' },
+  { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active' },
+  { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active' },
+  { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active' },
+  { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active' },
+  { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active' }
+];
+
+const DEFAULT_SETTINGS = {
+  title: '🌾 友邻聚落',
+  subtitle: '临渊羡鱼 · 且行且歌',
+  startDate: '2025-12-01 00:00:00'
+};
+
+
+// ===== EdgeOne 适配层 =====
+// KV 绑定：控制台绑定命名空间时填的「变量名」= 运行时全局变量名（NAV_LINKS）。
+// 同时兜底 context.env.NAV_LINKS，两种取值方式都可用。
+function getKV(context) {
+  try {
+    if (typeof NAV_LINKS !== 'undefined' && NAV_LINKS) return NAV_LINKS;
+  } catch (e) { /* 未绑定 */ }
+  return (context && context.env && context.env.NAV_LINKS) || null;
+}
+
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+};
+
+function json(data, status, extraHeaders) {
+  return new Response(JSON.stringify(data), {
+    status: status || 200,
+    headers: Object.assign(
+      { 'Content-Type': 'application/json; charset=UTF-8', 'Cache-Control': 'no-store' },
+      CORS_HEADERS,
+      extraHeaders || {}
+    )
+  });
+}
+
+function preflight() {
+  return new Response(null, { headers: CORS_HEADERS });
+}
+
 function getConfig(context) {
   const env = (context && context.env) || {};
   if (!env.ADMIN_USERNAME || !env.ADMIN_PASSWORD || !env.JWT_SECRET) return null;
@@ -154,23 +206,6 @@ function authError(e) {
   return json({ error: e.message }, unconfigured ? 500 : 401);
 }
 
-// ===== 默认数据（KV 不可用时的回退，与 _worker.js 保持一致）=====
-const DEFAULT_LINKS = [
-  { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active' },
-  { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active' },
-  { id: '3', name: '文件快递柜', url: 'https://file.fnosi.top', fallback: '📁', status: 'active' },
-  { id: '4', name: '飞牛NAS', url: 'https://fnos.fnosi.top', fallback: '🐮', status: 'active' },
-  { id: '5', name: '临渊羡鱼资源站', url: 'https://list.fnosi.top', fallback: '📦', status: 'active' },
-  { id: '6', name: '临渊羡鱼标签页', url: 'https://tab.fnosi.top', fallback: '🏷️', status: 'active' }
-];
-
-const DEFAULT_SETTINGS = {
-  title: '🌾 友邻聚落',
-  subtitle: '临渊羡鱼 · 且行且歌',
-  startDate: '2025-12-01 00:00:00'
-};
-
-// ===== 通用读取封装 =====
 async function readKV(context, key, fallback) {
   const kv = getKV(context);
   if (!kv) return { value: fallback, source: 'default' };
@@ -215,10 +250,6 @@ export default async function onRequest(context) {
     return json({ error: '用户名或密码错误' }, 401);
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  const token = await jwtSign(
-    { username, role: 'admin', exp: now + 3600, iat: now },
-    cfg.jwtSecret
-  );
-  return json({ token, user: { username, role: 'admin' }, expiresIn: 3600 });
+  const token = await issueAdminToken(username, cfg.jwtSecret);
+  return json({ token, user: { username, role: 'admin' }, expiresIn: TOKEN_TTL_SECONDS });
 }

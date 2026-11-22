@@ -8,6 +8,8 @@ var KEYS = {
     theme: 'theme'
 };
 
+// KV 不可达时的兜底列表：若后台加载失败且用户直接编辑，getLinks() 为空数组会导致
+// 保存时用「仅含新增项」的列表覆盖云端全部数据。此处返回默认值可避免该数据丢失路径
 var DEFAULT_LINKS = [
     { id: '1', name: '临渊羡鱼博客', url: 'https://blog.fnosi.top', fallback: '临', status: 'active' },
     { id: '2', name: '临渊羡鱼图床', url: 'https://imge.fnosi.top', fallback: '图', status: 'active' },

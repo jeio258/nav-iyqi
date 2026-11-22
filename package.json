@@ -1,19 +1,22 @@
 {
   "name": "navigation-page",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "临渊羡鱼 · 导航页 - 带后台管理的个人导航网站",
   "private": true,
   "scripts": {
     "dev": "wrangler pages dev .",
     "deploy": "wrangler pages deploy .",
     "kv:create": "wrangler kv:namespace create NAV_LINKS",
-    "secret:set": "wrangler secret put JWT_SECRET"
+    "secret:set": "wrangler secret put JWT_SECRET",
+    "build:backends": "node scripts/build-backends.js"
   },
   "keywords": [
     "navigation",
     "cloudflare",
+    "edgeone",
     "pages",
-    "worker"
+    "worker",
+    "serverless"
   ],
   "author": "临渊羡鱼",
   "license": "MIT",
