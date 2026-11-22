@@ -1,12 +1,4 @@
-// ========== 配置 ==========
-var API = '/api';
-var KEYS = {
-    token: 'admin_token',
-    links: 'nav_links',
-    linksUpdatedAt: 'nav_links_updated_at',
-    settings: 'nav_settings',
-    theme: 'theme'
-};
+// 存储键与接口路径统一来自 shared/frontend.js 注入的 NAV（见 admin.html）
 
 // KV 不可达时的兜底列表：若后台加载失败且用户直接编辑，getLinks() 为空数组会导致
 // 保存时用「仅含新增项」的列表覆盖云端全部数据。此处返回默认值可避免该数据丢失路径
@@ -27,17 +19,6 @@ var DEFAULT_SETTINGS = {
 
 // ========== DOM 与工具 ==========
 function $(id) { return document.getElementById(id); }
-
-function readJSON(key, fallback) {
-    try {
-        var raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : fallback;
-    } catch (e) { return fallback; }
-}
-
-function writeJSON(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
-}
 
 // 静默状态提示：成功 2s、错误 4s 自动消失
 function showStatus(id, message, isError) {
@@ -62,27 +43,27 @@ function generateId() {
 
 // ========== 本地数据 ==========
 function getLinks() {
-    var links = readJSON(KEYS.links, null);
+    var links = readJSON(NAV.storage.links, null);
     return Array.isArray(links) ? links : DEFAULT_LINKS.slice();
 }
 
 function saveLinksLocal(links) {
-    writeJSON(KEYS.links, links);
+    writeJSON(NAV.storage.links, links);
     // 写入更新戳（同源 localStorage 共享），首页据此使旧缓存立即失效，
     // 否则后台新增链接后首页仍先用缓存渲染旧数据，表现为需要刷新两遍
-    try { localStorage.setItem(KEYS.linksUpdatedAt, String(Date.now())); } catch (e) {}
+    try { localStorage.setItem(NAV.storage.linksUpdatedAt, String(Date.now())); } catch (e) {}
 }
 
 function getSettings() {
-    return Object.assign({}, DEFAULT_SETTINGS, readJSON(KEYS.settings, null) || {});
+    return Object.assign({}, DEFAULT_SETTINGS, readJSON(NAV.storage.settings, null) || {});
 }
 
-function saveSettingsLocal(settings) { writeJSON(KEYS.settings, settings); }
+function saveSettingsLocal(settings) { writeJSON(NAV.storage.settings, settings); }
 
 // ========== 认证 ==========
-function getToken() { return localStorage.getItem(KEYS.token); }
-function setToken(token) { localStorage.setItem(KEYS.token, token); }
-function clearToken() { localStorage.removeItem(KEYS.token); }
+function getToken() { return localStorage.getItem(NAV.storage.token); }
+function setToken(token) { localStorage.setItem(NAV.storage.token, token); }
+function clearToken() { localStorage.removeItem(NAV.storage.token); }
 
 // 本地快速判断：仅解 payload 看 exp，真实有效性以服务端 verify 为准
 function tokenLooksValid() {
@@ -100,8 +81,9 @@ function authHeaders() {
     return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() };
 }
 
-async function apiFetch(path, options) {
-    var response = await fetch(API + path, options);
+// endpoint 取 NAV.api 的键名（login/verify/links/settings/health）
+async function apiFetch(endpoint, options) {
+    var response = await fetch(NAV.api[endpoint], options);
     var data = null;
     try { data = await response.json(); } catch (e) {}
     return { ok: response.ok, status: response.status, data: data };
@@ -109,7 +91,7 @@ async function apiFetch(path, options) {
 
 async function login(username, password) {
     try {
-        var res = await apiFetch('/auth/login', {
+        var res = await apiFetch('login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: username, password: password })
@@ -125,7 +107,7 @@ async function login(username, password) {
 async function verifyTokenOnServer() {
     if (!getToken()) return false;
     try {
-        var res = await apiFetch('/auth/verify', { headers: authHeaders() });
+        var res = await apiFetch('verify', { headers: authHeaders() });
         return res.ok;
     } catch (e) { return false; }
 }
@@ -134,7 +116,7 @@ async function verifyTokenOnServer() {
 async function putLinks(links) {
     if (!getToken()) return { ok: false, error: '登录已过期' };
     try {
-        var res = await apiFetch('/links', {
+        var res = await apiFetch('links', {
             method: 'PUT',
             headers: authHeaders(),
             body: JSON.stringify({ links: links })
@@ -166,7 +148,7 @@ async function manualSync() {
 
 async function loadLinksFromServer() {
     try {
-        var res = await apiFetch('/links');
+        var res = await apiFetch('links');
         if (res.ok && res.data && Array.isArray(res.data.links) && res.data.links.length) {
             saveLinksLocal(res.data.links);
             return res.data.links;
@@ -344,7 +326,7 @@ function fillSettingsForm(settings) {
 
 async function loadSettingsFromServer() {
     try {
-        var res = await apiFetch('/settings');
+        var res = await apiFetch('settings');
         if (res.ok && res.data && res.data.settings) {
             saveSettingsLocal(res.data.settings);
             return res.data.settings;
@@ -367,7 +349,7 @@ async function saveSettings() {
     }
 
     try {
-        var res = await apiFetch('/settings', {
+        var res = await apiFetch('settings', {
             method: 'PUT',
             headers: authHeaders(),
             body: JSON.stringify({ settings: settings })
@@ -395,29 +377,12 @@ function showLoginPanel() {
     $('loginAlert').style.display = 'none';
 }
 
-// ========== 主题（与 index.html 共用同一 key） ==========
-function applyTheme(theme) {
-    var dark = theme === 'dark';
-    if (dark) document.documentElement.setAttribute('data-theme', 'dark');
-    else document.documentElement.removeAttribute('data-theme');
-
-    var icon = $('themeIcon');
-    var label = $('themeLabel');
-    if (icon) icon.textContent = dark ? '☀️' : '🌙';
-    if (label) label.textContent = dark ? '浅色' : '深色';
-
-    var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', dark ? '#1a1512' : '#f5ebe0');
-
-    localStorage.setItem(KEYS.theme, theme);
-}
-
 // ========== 事件绑定 ==========
 document.addEventListener('DOMContentLoaded', async function () {
     if (tokenLooksValid() && await verifyTokenOnServer()) showAdminPanel();
     else { clearToken(); showLoginPanel(); }
 
-    applyTheme(localStorage.getItem(KEYS.theme) ||
+    applyTheme(localStorage.getItem(NAV.storage.theme) ||
         (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 
     // 登录
@@ -472,6 +437,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
-        if (!localStorage.getItem(KEYS.theme)) applyTheme(e.matches ? 'dark' : 'light');
+        if (!localStorage.getItem(NAV.storage.theme)) applyTheme(e.matches ? 'dark' : 'light');
     });
 });

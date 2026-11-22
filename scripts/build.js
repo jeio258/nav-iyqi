@@ -502,3 +502,37 @@ for (const [file, spec] of Object.entries(EDGEONE_HANDLERS)) {
 }
 
 console.log(`\n完成，共 ${count} 个产物。源：shared/core.js`);
+
+// ===================== 前端公共层注入 =====================
+// 把 shared/frontend.js 注入 index.html / admin.html 的 @inject 标记处。
+// 内联而非外链：applyTheme 必须在首屏渲染前执行，外链会延迟导致主题闪白。
+const FRONTEND_SRC = path.join(ROOT, 'shared', 'frontend.js');
+const PAGES = ['index.html', 'admin.html'];
+const INJECT_MARK = '/* @inject:frontend-common';
+
+function injectFrontend() {
+  const snippet = fs.readFileSync(FRONTEND_SRC, 'utf8').trimEnd();
+  for (const page of PAGES) {
+    const file = path.join(ROOT, page);
+    let html = fs.readFileSync(file, 'utf8');
+    const markerLine = html.split('\n').find((l) => l.trim().startsWith(INJECT_MARK));
+    if (!markerLine) {
+      console.warn(`跳过 ${page}：未找到注入标记`);
+      continue;
+    }
+    // 用「标记行 + 源码」替换「标记行 + 旧内容」；标记行保留作为下次定位锚点
+    const startIdx = html.indexOf(markerLine);
+    const endIdx = html.indexOf('</script>', startIdx);
+    if (endIdx < 0) {
+      console.warn(`跳过 ${page}：注入区未闭合`);
+      continue;
+    }
+    const injected = markerLine + '\n' + snippet + '\n';
+    html = html.slice(0, startIdx) + injected + html.slice(endIdx);
+    fs.writeFileSync(file, html);
+    console.log('注入: ' + page);
+  }
+}
+
+injectFrontend();
+console.log('\n前端公共层注入完成（源：shared/frontend.js）');

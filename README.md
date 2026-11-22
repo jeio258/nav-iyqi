@@ -44,12 +44,15 @@ nav-iyqi/
 ├── admin.html              # 后台管理页
 ├── admin.js                # 后台逻辑
 │
-├── shared/core.js          # 【唯一来源】平台无关核心逻辑（JWT/校验/默认数据）
+├── shared/
+│   ├── core.js             # 【唯一来源】后端平台无关逻辑（JWT/校验/默认数据）
+│   └── frontend.js         # 【唯一来源】前端公共层（存储键/接口路径/主题）
+├── scripts/build.js        # 统一构建入口：注入前端公共层 + 生成两平台后端产物
+│
 ├── _worker.js              # 【生成】Cloudflare Worker（勿手改）
 ├── edge-functions/         # 【生成】EdgeOne 函数（勿手改）
 │   └── api/{health,links,settings}.js, api/auth/{login,verify}.js
 ├── edgeone.json            # EdgeOne 部署配置
-├── scripts/build-backends.js  # 生成器：core.js → 两平台产物
 │
 ├── wrangler.toml           # Cloudflare 部署配置
 ├── .dev.vars.example       # 本地开发环境变量模板
@@ -58,8 +61,15 @@ nav-iyqi/
 └── README.md               # 说明文档
 ```
 
-> 带【生成】标记的文件由 `npm run build:backends` 从 `shared/core.js` 产出，
-> 请勿直接修改；改后端逻辑请改 `shared/core.js` 后重新生成。
+> **生成物说明**：带【生成】标记的文件、以及 `index.html`/`admin.html` 中的
+> `@inject:frontend-common` 注入区，均由 `npm run build` 产出，**请勿手改**。
+>
+> - 改后端逻辑（JWT/校验/接口）→ 改 `shared/core.js`
+> - 改存储键 / 接口路径 / 主题逻辑 → 改 `shared/frontend.js`
+> - 改完执行 `npm run build` 同步到所有产物
+>
+> **为什么内联而不拆成外部文件**：`applyTheme` 必须首屏渲染前执行，外链会延迟导致
+> 主题闪白；内联 + 单一源生成可同时保证一致性与首屏速度。
 
 ---
 

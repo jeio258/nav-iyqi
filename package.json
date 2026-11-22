@@ -8,7 +8,7 @@
     "deploy": "wrangler pages deploy .",
     "kv:create": "wrangler kv:namespace create NAV_LINKS",
     "secret:set": "wrangler secret put JWT_SECRET",
-    "build:backends": "node scripts/build-backends.js"
+    "build": "node scripts/build.js"
   },
   "keywords": [
     "navigation",
