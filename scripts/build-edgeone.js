@@ -15,7 +15,7 @@ const shared = fs
   .replace(/^export\s+/gm, '');
 
 const HANDLERS = {
-  'api/health.js': {
+  'health.js': {
     methods: 'GET',
     desc: '健康检查：确认部署成功、KV 是否绑定',
     body: `
@@ -30,7 +30,7 @@ export default function onRequest(context) {
 }`
   },
 
-  'api/auth/login.js': {
+  'auth/login.js': {
     methods: 'POST',
     desc: '管理员登录，签发 1 小时 JWT',
     body: `
@@ -61,7 +61,7 @@ export default async function onRequest(context) {
 }`
   },
 
-  'api/auth/verify.js': {
+  'auth/verify.js': {
     methods: 'GET',
     desc: '校验令牌是否有效',
     body: `
@@ -76,7 +76,7 @@ export default async function onRequest(context) {
 }`
   },
 
-  'api/links.js': {
+  'links.js': {
     methods: 'GET, PUT',
     desc: '链接列表：GET 公开读取，PUT 需鉴权写入',
     body: `
@@ -117,7 +117,7 @@ export default async function onRequest(context) {
 }`
   },
 
-  'api/settings.js': {
+  'settings.js': {
     methods: 'GET, PUT',
     desc: '站点设置：GET 公开读取，PUT 需鉴权写入',
     body: `
@@ -158,7 +158,8 @@ export default async function onRequest(context) {
 let count = 0;
 for (const [file, spec] of Object.entries(HANDLERS)) {
   const outPath = path.join(API_DIR, file);
-  const header = `// EdgeOne Makers Edge Function —— 路由 /${file.replace(/^api\//, 'api/').replace(/\.js$/, '')}\n` +
+  const routePath = '/api/' + file.replace(/\.js$/, '');
+  const header = `// EdgeOne Makers Edge Function —— 路由 ${routePath}\n` +
     `// 支持方法：${spec.methods}；${spec.desc}\n` +
     `// 本文件由 scripts/build-edgeone.js 从 _shared.js 生成，请勿手改（改 _shared.js 后重新生成）\n`;
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
